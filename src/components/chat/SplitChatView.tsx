@@ -1,0 +1,606 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Conversation, Message, Contact } from '@/types';
+import { api } from '@/lib/api';
+import {
+  formatKarachiTime,
+  formatKarachiDateTime,
+  formatPhone,
+  isWithin24Hours,
+  formatDateDivider,
+} from '@/lib/utils';
+import { NavRail } from '@/components/navigation/NavRail';
+import { InboxFolderSidebar } from '@/components/chat/InboxFolderSidebar';
+import { ContactDetailsDrawer } from '@/components/chat/ContactDetailsDrawer';
+import { MessageBubble } from '@/components/thread/MessageBubble';
+import { DateDivider } from '@/components/thread/DateDivider';
+import {
+  Search,
+  RefreshCw,
+  X,
+  Flame,
+  Clock,
+  MessageSquare,
+  Bot,
+  User as UserIcon,
+  Check,
+  CheckCheck,
+  ArrowLeft,
+  ChevronRight,
+  ChevronDown,
+  Info,
+  ExternalLink,
+  ShieldCheck,
+  Calendar,
+  Phone,
+  SlidersHorizontal,
+  Bell,
+  Tag,
+  CheckSquare,
+  Pause,
+  Play,
+  PanelRightClose,
+  PanelRightOpen,
+  Filter,
+} from 'lucide-react';
+
+interface SplitChatViewProps {
+  initialId?: number;
+}
+
+export function SplitChatView({ initialId }: SplitChatViewProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Selected conversation ID from URL or initialId
+  const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : initialId;
+
+  // Conversations list state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFolder, setSelectedFolder] = useState<string>('all');
+  const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed'>('open');
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [selectedId, setSelectedId] = useState<number | null>(urlId || null);
+
+  // Layout drawer toggles
+  const [collapseNavRail, setCollapseNavRail] = useState(false);
+  const [collapseFolderSidebar, setCollapseFolderSidebar] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
+
+  // Active thread state
+  const [activeData, setActiveData] = useState<{
+    conversation: Conversation;
+    messages: Message[];
+  } | null>(null);
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [refreshingThread, setRefreshingThread] = useState(false);
+
+  // Lightbox
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // Messages container scroll reference
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch conversations with auto-polling for incoming messages
+  const loadConversations = async (showLoading = false) => {
+    try {
+      if (showLoading) setLoadingList(true);
+      const res = await api.getConversations();
+      setConversations(res.items);
+
+      // If no selectedId, default to the latest conversation
+      setSelectedId((prev) => (prev ? prev : (res.items.length > 0 ? res.items[0].id : null)));
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+    } finally {
+      if (showLoading) setLoadingList(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConversations(true);
+    // Poll every 4 seconds so newly received WhatsApp messages appear live
+    const timer = setInterval(() => {
+      loadConversations(false);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Fetch active conversation messages with 3s silent auto-polling so new messages appear live
+  useEffect(() => {
+    if (!selectedId) return;
+
+    let isMounted = true;
+
+    async function fetchThread(showSpinner = false) {
+      try {
+        if (showSpinner) setLoadingThread(true);
+        const data = await api.getConversation(selectedId!);
+        if (isMounted) {
+          setActiveData((prev) => {
+            // Avoid unnecessary re-renders if message count has not changed
+            if (prev?.messages?.length === data?.messages?.length && prev?.conversation?.last_message_at === data?.conversation?.last_message_at) {
+              return prev;
+            }
+            return data;
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to load conversation #${selectedId}:`, err);
+      } finally {
+        if (showSpinner && isMounted) setLoadingThread(false);
+      }
+    }
+
+    fetchThread(true);
+
+    const timer = setInterval(() => {
+      fetchThread(false);
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [selectedId]);
+
+  // Refresh thread handler
+  const handleRefreshThread = async () => {
+    if (!selectedId) return;
+    try {
+      setRefreshingThread(true);
+      const data = await api.getConversation(selectedId);
+      setActiveData(data);
+    } catch (err) {
+      console.error('Failed to refresh thread:', err);
+    } finally {
+      setRefreshingThread(false);
+    }
+  };
+
+  // Auto-scroll to bottom of thread
+  useEffect(() => {
+    if (activeData?.messages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeData?.messages]);
+
+  // Counts for folders
+  const folderCounts = useMemo(() => {
+    const total = conversations.length;
+    const active = conversations.filter((c) => isWithin24Hours(c.last_message_at)).length;
+    return {
+      all: total,
+      active,
+      bot: total,
+      unassigned: 0,
+      reminders: 1,
+    };
+  }, [conversations]);
+
+  // Filtered & Sorted conversations list
+  const filteredConversations = useMemo(() => {
+    return conversations
+      .filter((conv) => {
+        // Search query filter
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const name = (conv.contact?.profile_name || '').toLowerCase();
+          const phone = (conv.contact?.wa_id || '').toLowerCase();
+          const lastMsg = (conv.last_message?.body || '').toLowerCase();
+          if (!name.includes(q) && !phone.includes(q) && !lastMsg.includes(q)) {
+            return false;
+          }
+        }
+
+        // Folder category filter
+        if (selectedFolder === 'active') {
+          if (!isWithin24Hours(conv.last_message_at)) return false;
+        } else if (selectedFolder === 'unassigned') {
+          return false;
+        } else if (selectedFolder === 'reminders') {
+          if (conv.id !== 2) return false;
+        } else if (selectedFolder === 'favorites') {
+          if (conv.id !== 1) return false;
+        } else if (selectedFolder === 'hot_leads') {
+          if (!isWithin24Hours(conv.last_message_at)) return false;
+        }
+
+        // Dropdown Chat filter
+        if (chatFilter === 'active24h') {
+          return isWithin24Hours(conv.last_message_at);
+        }
+        if (chatFilter === 'closed') {
+          return !isWithin24Hours(conv.last_message_at);
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.last_message_at).getTime();
+        const timeB = new Date(b.last_message_at).getTime();
+        return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
+      });
+  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder]);
+
+  // Select a conversation and update URL
+  const handleSelectConversation = (id: number) => {
+    setSelectedId(id);
+    router.replace(`/conversations?id=${id}`, { scroll: false });
+  };
+
+  return (
+    <div className="flex w-full h-full bg-white select-none overflow-hidden font-sans">
+      {/* COLUMN 1: Far-Left Icon Navigation Rail */}
+      <NavRail
+        collapsed={collapseNavRail}
+        onToggleCollapse={() => setCollapseNavRail(!collapseNavRail)}
+      />
+
+      {/* COLUMN 2: Inbox Folder Sidebar */}
+      <InboxFolderSidebar
+        selectedFolder={selectedFolder}
+        onSelectFolder={setSelectedFolder}
+        counts={folderCounts}
+        collapsed={collapseFolderSidebar}
+        onToggleCollapse={() => setCollapseFolderSidebar(!collapseFolderSidebar)}
+      />
+
+      {/* COLUMN 3: Conversation Thread List Pane */}
+      <div className="w-80 sm:w-88 flex-shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full z-10">
+        {/* Top Control / Filter Bar */}
+        <div className="p-3 border-b border-[#E5E7EB] space-y-2 bg-white">
+          {/* Quick Filter Controls matching reference screenshot */}
+          <div className="flex items-center justify-between gap-1.5 text-xs">
+            {/* Open Chats Dropdown */}
+            <div className="relative inline-block">
+              <select
+                value={chatFilter}
+                onChange={(e) => setChatFilter(e.target.value as any)}
+                className="appearance-none pl-2.5 pr-6 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
+              >
+                <option value="open">💬 Open Chats</option>
+                <option value="active24h">🔥 Active 24h</option>
+                <option value="closed">⏱ Closed</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Unread Pill Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                showUnreadOnly
+                  ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                  : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'
+              }`}
+            >
+              Unread
+            </button>
+
+            {/* Sort: Newest ▾ Dropdown */}
+            <div className="relative inline-block">
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as any)}
+                className="appearance-none pl-2.5 pr-6 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
+              >
+                <option value="newest">⇅ Sort: Newest</option>
+                <option value="oldest">⇅ Sort: Oldest</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Quick Search input within list */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter by contact name or message..."
+              className="w-full pl-8 pr-7 py-1.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#1A1A1A] placeholder-[#9CA3AF] focus:outline-none focus:ring-1 focus:ring-[#D92228] transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#1A1A1A]"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Conversation Items List */}
+        <div className="flex-1 overflow-y-auto divide-y divide-[#E5E7EB]">
+          {loadingList ? (
+            <div className="p-8 text-center text-[#6B7280]">
+              <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#D92228] mb-2" />
+              <p className="text-xs">Loading conversations...</p>
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <div className="p-8 text-center text-[#6B7280]">
+              <MessageSquare className="w-8 h-8 mx-auto text-[#9CA3AF] mb-2 opacity-60" />
+              <p className="text-xs font-semibold text-[#1A1A1A]">No conversations found</p>
+              <p className="text-[11px] text-[#6B7280] mt-1">Try resetting your filters</p>
+            </div>
+          ) : (
+            filteredConversations.map((conv) => {
+              const isSelected = conv.id === selectedId;
+              const contactName = conv.contact?.profile_name || 'WhatsApp Contact';
+              const active = isWithin24Hours(conv.last_message_at);
+              const lastMsg = conv.last_message;
+              const isBotMsg = lastMsg?.direction === 'bot';
+
+              return (
+                <div
+                  key={conv.id}
+                  onClick={() => handleSelectConversation(conv.id)}
+                  className={`p-3.5 transition-all cursor-pointer relative ${
+                    isSelected
+                      ? 'bg-[#FDEBEC]/40 border-l-4 border-[#D92228]'
+                      : 'bg-white hover:bg-[#F9FAFB]'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Contact Avatar */}
+                    <div className="relative flex-shrink-0 mt-0.5">
+                      <div className="w-10 h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center border border-[#F5C2C4]">
+                        {contactName[0]?.toUpperCase() || 'W'}
+                      </div>
+                      {active && (
+                        <span
+                          className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white ring-1 ring-[#16A34A]/20"
+                          title="Active 24h Customer Window"
+                        />
+                      )}
+                    </div>
+
+                    {/* Contact Info & Message Snippet */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-1 mb-0.5">
+                        <h3
+                          className={`text-xs font-bold truncate ${
+                            isSelected ? 'text-[#D92228]' : 'text-[#1A1A1A]'
+                          }`}
+                        >
+                          {contactName}
+                        </h3>
+                        <span className="text-[10px] text-[#9CA3AF] whitespace-nowrap flex-shrink-0 font-mono">
+                          {formatKarachiTime(conv.last_message_at)}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-[#6B7280] truncate leading-relaxed">
+                        {isBotMsg ? (
+                          <span className="text-[#D92228] font-medium mr-1">You:</span>
+                        ) : null}
+                        {lastMsg?.body || 'Attachment'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* COLUMN 4: Middle Main Chat Viewport */}
+      <div className="flex-1 flex flex-col h-full bg-white relative min-w-0">
+        {activeData ? (
+          <>
+            {/* Top Contact Header Bar matching reference screenshot */}
+            <div className="p-3.5 sm:px-6 border-b border-[#E5E7EB] flex items-center justify-between gap-3 bg-white shadow-xs z-10">
+              {/* Left: Contact Identity & Assigned Agent Dropdown */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
+                  {activeData.conversation.contact?.profile_name?.[0]?.toUpperCase() || 'W'}
+                </div>
+
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-[#1A1A1A] truncate leading-tight">
+                    {activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}
+                  </h2>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[11px] font-medium text-[#6B7280]">
+                      Assigned to:
+                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#D92228] bg-[#FDEBEC] px-2 py-0.5 rounded-md hover:bg-[#F5C2C4] transition-colors cursor-pointer"
+                    >
+                      <Bot className="w-3 h-3 text-[#D92228]" />
+                      <span>Eureka Jo AI Bot</span>
+                      <ChevronDown className="w-3 h-3 ml-0.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Quick CRM Actions matching screenshot */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleRefreshThread}
+                  disabled={refreshingThread}
+                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors cursor-pointer"
+                  title="Refresh Conversation"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 text-[#D92228] ${
+                      refreshingThread ? 'animate-spin' : ''
+                    }`}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors"
+                  title="Snooze / Reminder"
+                >
+                  <Clock className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#16A34A] hover:bg-emerald-50 transition-colors"
+                  title="Mark Resolved"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
+                  title="Add Tag"
+                >
+                  <Tag className="w-4 h-4" />
+                </button>
+
+                {/* Toggle Right Contact Details Drawer */}
+                <button
+                  type="button"
+                  onClick={() => setShowDetails(!showDetails)}
+                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                    showDetails
+                      ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                      : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'
+                  }`}
+                  title="Toggle Contact CRM Drawer"
+                >
+                  {showDetails ? (
+                    <PanelRightClose className="w-4 h-4" />
+                  ) : (
+                    <PanelRightOpen className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Platform Tab Indicator Banner matching reference screenshot */}
+            <div className="px-6 py-2 bg-[#F9FAFB] border-b border-[#E5E7EB] flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
+                  WhatsApp Cloud API
+                </span>
+                <span className="text-[11px] text-[#6B7280] hidden md:inline">
+                  +{activeData.conversation.contact?.wa_id}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 text-[#6B7280] text-[11px]">
+                <span className="hidden lg:inline">
+                  Eureka Jo AI Bot is actively responding to inquiries. Live human handover is on standby.
+                </span>
+                <span className="inline-block px-1.5 py-0.2 rounded bg-white border border-[#E5E7EB] font-mono text-[10px]">
+                  n8n active
+                </span>
+              </div>
+            </div>
+
+            {/* Message Stream Viewport */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 bg-white">
+              {loadingThread ? (
+                <div className="flex items-center justify-center h-full text-[#6B7280]">
+                  <RefreshCw className="w-6 h-6 animate-spin text-[#D92228] mr-2" />
+                  <span className="text-xs font-semibold">Loading messages...</span>
+                </div>
+              ) : activeData.messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-[#6B7280]">
+                  <MessageSquare className="w-10 h-10 text-gray-300 mb-2" />
+                  <p className="text-sm font-semibold text-[#1A1A1A]">No messages yet</p>
+                  <p className="text-xs text-[#6B7280]">
+                    Inbound customer messages and bot replies will appear here.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <DateDivider dateStr={activeData.messages[0]?.sent_at} />
+
+                  {activeData.messages.map((msg) => (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      contactName={
+                        activeData.conversation.contact?.profile_name || 'Customer'
+                      }
+                      onImageClick={(url) => setSelectedImage(url)}
+                    />
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </div>
+
+            {/* Read-Only Status Bar matching reference screenshot */}
+            <div className="p-3 bg-[#F9FAFB] border-t border-[#E5E7EB] text-center text-xs text-[#6B7280] flex items-center justify-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#D92228]" />
+              <span>
+                You have read-only rights to view this conversation. Automated replies are processed in real-time by Eureka Jo Bot.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowDetails(true)}
+                className="font-semibold text-[#D92228] hover:underline cursor-pointer ml-1"
+              >
+                View Contact CRM
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-[#6B7280] p-8">
+            <div className="w-16 h-16 rounded-3xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center mb-4 border border-[#F5C2C4]">
+              <MessageSquare className="w-8 h-8" />
+            </div>
+            <h3 className="text-base font-bold text-[#1A1A1A]">Select a Conversation</h3>
+            <p className="text-xs text-[#6B7280] mt-1 text-center max-w-sm">
+              Choose an active thread from the inbox to review the live dialogue between the customer and Eureka Jo Bot.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* COLUMN 5: Far-Right CRM Customer 360 Drawer */}
+      {showDetails && activeData && (
+        <ContactDetailsDrawer
+          conversation={activeData.conversation}
+          totalMessages={activeData.messages.length}
+          onClose={() => setShowDetails(false)}
+        />
+      )}
+
+      {/* Lightbox Modal */}
+      {selectedImage && (
+        <div
+          onClick={() => setSelectedImage(null)}
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl">
+            <img
+              src={selectedImage}
+              alt="Expanded WhatsApp Media"
+              className="w-full h-auto max-h-[85vh] object-contain rounded-2xl"
+            />
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
