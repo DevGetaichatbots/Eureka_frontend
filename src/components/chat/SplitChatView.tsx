@@ -10,6 +10,7 @@ import {
   formatPhone,
   isWithin24Hours,
   formatDateDivider,
+  karachiDateKey,
 } from '@/lib/utils';
 import { NavRail } from '@/components/navigation/NavRail';
 import { InboxFolderSidebar } from '@/components/chat/InboxFolderSidebar';
@@ -83,8 +84,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   // Lightbox
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Messages container scroll reference
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Scroll the message pane only — never the whole page
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const lastMessageKeyRef = useRef('');
+  const prevSelectedIdRef = useRef<number | null>(null);
 
   // Fetch conversations with auto-polling for incoming messages
   const loadConversations = async (showLoading = false) => {
@@ -123,8 +127,14 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         const data = await api.getConversation(selectedId!);
         if (isMounted) {
           setActiveData((prev) => {
-            // Avoid unnecessary re-renders if message count has not changed
-            if (prev?.messages?.length === data?.messages?.length && prev?.conversation?.last_message_at === data?.conversation?.last_message_at) {
+            const prevLast = prev?.messages?.[prev.messages.length - 1];
+            const nextLast = data?.messages?.[data.messages.length - 1];
+            if (
+              prev &&
+              prev.messages.length === data.messages.length &&
+              prevLast?.id === nextLast?.id &&
+              prev.conversation.last_message_at === data.conversation.last_message_at
+            ) {
               return prev;
             }
             return data;
@@ -163,12 +173,54 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     }
   };
 
-  // Auto-scroll to bottom of thread
-  useEffect(() => {
-    if (activeData?.messages) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+  const sortedMessages = useMemo(() => {
+    if (!activeData?.messages?.length) return [];
+    return [...activeData.messages].sort((a, b) => {
+      const ta = new Date(a.sent_at || a.created_at).getTime();
+      const tb = new Date(b.sent_at || b.created_at).getTime();
+      if (ta !== tb) return ta - tb;
+      const ca = new Date(a.created_at || a.sent_at).getTime();
+      const cb = new Date(b.created_at || b.sent_at).getTime();
+      if (ca !== cb) return ca - cb;
+      return (a.id || 0) - (b.id || 0);
+    });
   }, [activeData?.messages]);
+
+  const isNearBottom = (el: HTMLDivElement) =>
+    el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+
+  const handleMessagesScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    stickToBottomRef.current = isNearBottom(el);
+  };
+
+  // Keep the thread pinned to the latest message unless the user scrolled up to read history
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+
+    const last = sortedMessages[sortedMessages.length - 1];
+    const key = last ? `${last.id}:${last.sent_at}` : 'empty';
+    const switchedConversation = prevSelectedIdRef.current !== selectedId;
+    prevSelectedIdRef.current = selectedId;
+
+    if (switchedConversation) {
+      stickToBottomRef.current = true;
+      lastMessageKeyRef.current = key;
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+      return;
+    }
+
+    const hasNewMessage = key !== lastMessageKeyRef.current;
+    lastMessageKeyRef.current = key;
+
+    if (hasNewMessage && stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [sortedMessages, selectedId]);
 
   // Counts for folders
   const folderCounts = useMemo(() => {
@@ -235,7 +287,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   };
 
   return (
-    <div className="flex w-full h-full bg-white select-none overflow-hidden font-sans">
+    <div className="flex w-full h-full min-h-0 bg-white select-none overflow-hidden font-sans">
       {/* COLUMN 1: Far-Left Icon Navigation Rail */}
       <NavRail
         collapsed={collapseNavRail}
@@ -252,7 +304,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       />
 
       {/* COLUMN 3: Conversation Thread List Pane */}
-      <div className="w-80 sm:w-88 flex-shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full z-10">
+      <div className="w-80 sm:w-88 flex-shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full min-h-0 z-10">
         {/* Top Control / Filter Bar */}
         <div className="p-3 border-b border-[#E5E7EB] space-y-2 bg-white">
           {/* Quick Filter Controls matching reference screenshot */}
@@ -396,11 +448,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       </div>
 
       {/* COLUMN 4: Middle Main Chat Viewport */}
-      <div className="flex-1 flex flex-col h-full bg-white relative min-w-0">
+      <div className="flex-1 flex flex-col h-full min-h-0 bg-white relative min-w-0">
         {activeData ? (
           <>
             {/* Top Contact Header Bar matching reference screenshot */}
-            <div className="p-3.5 sm:px-6 border-b border-[#E5E7EB] flex items-center justify-between gap-3 bg-white shadow-xs z-10">
+            <div className="p-3.5 sm:px-6 border-b border-[#E5E7EB] flex items-center justify-between gap-3 bg-white shadow-xs z-10 flex-shrink-0">
               {/* Left: Contact Identity & Assigned Agent Dropdown */}
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
@@ -488,7 +540,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
             </div>
 
             {/* Platform Tab Indicator Banner matching reference screenshot */}
-            <div className="px-6 py-2 bg-[#F9FAFB] border-b border-[#E5E7EB] flex items-center justify-between gap-3 text-xs">
+            <div className="px-6 py-2 bg-[#F9FAFB] border-b border-[#E5E7EB] flex items-center justify-between gap-3 text-xs flex-shrink-0">
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
@@ -509,14 +561,18 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               </div>
             </div>
 
-            {/* Message Stream Viewport */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 bg-white">
+            {/* Message Stream Viewport — isolated scrollbar, does not move the page */}
+            <div
+              ref={messagesContainerRef}
+              onScroll={handleMessagesScroll}
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-3 bg-white overscroll-contain"
+            >
               {loadingThread ? (
                 <div className="flex items-center justify-center h-full text-[#6B7280]">
                   <RefreshCw className="w-6 h-6 animate-spin text-[#D92228] mr-2" />
                   <span className="text-xs font-semibold">Loading messages...</span>
                 </div>
-              ) : activeData.messages.length === 0 ? (
+              ) : sortedMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-[#6B7280]">
                   <MessageSquare className="w-10 h-10 text-gray-300 mb-2" />
                   <p className="text-sm font-semibold text-[#1A1A1A]">No messages yet</p>
@@ -525,26 +581,33 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                   </p>
                 </div>
               ) : (
-                <>
-                  <DateDivider dateStr={activeData.messages[0]?.sent_at} />
+                sortedMessages.map((msg, index) => {
+                  const prev = sortedMessages[index - 1];
+                  const showDivider =
+                    !prev ||
+                    karachiDateKey(prev.sent_at || prev.created_at) !==
+                      karachiDateKey(msg.sent_at || msg.created_at);
 
-                  {activeData.messages.map((msg) => (
-                    <MessageBubble
-                      key={msg.id}
-                      message={msg}
-                      contactName={
-                        activeData.conversation.contact?.profile_name || 'Customer'
-                      }
-                      onImageClick={(url) => setSelectedImage(url)}
-                    />
-                  ))}
-                  <div ref={messagesEndRef} />
-                </>
+                  return (
+                    <React.Fragment key={msg.id}>
+                      {showDivider ? (
+                        <DateDivider dateStr={msg.sent_at || msg.created_at} />
+                      ) : null}
+                      <MessageBubble
+                        message={msg}
+                        contactName={
+                          activeData.conversation.contact?.profile_name || 'Customer'
+                        }
+                        onImageClick={(url) => setSelectedImage(url)}
+                      />
+                    </React.Fragment>
+                  );
+                })
               )}
             </div>
 
             {/* Read-Only Status Bar matching reference screenshot */}
-            <div className="p-3 bg-[#F9FAFB] border-t border-[#E5E7EB] text-center text-xs text-[#6B7280] flex items-center justify-center gap-2">
+            <div className="p-3 bg-[#F9FAFB] border-t border-[#E5E7EB] text-center text-xs text-[#6B7280] flex items-center justify-center gap-2 flex-shrink-0">
               <ShieldCheck className="w-4 h-4 text-[#D92228]" />
               <span>
                 You have read-only rights to view this conversation. Automated replies are processed in real-time by Eureka Jo Bot.

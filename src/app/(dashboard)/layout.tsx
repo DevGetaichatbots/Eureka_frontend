@@ -48,7 +48,13 @@ export default function DashboardLayout({
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div
+      className={`flex flex-col bg-white ${
+        pathname.startsWith('/conversations')
+          ? 'h-screen overflow-hidden'
+          : 'min-h-screen'
+      }`}
+    >
       {/* Top Navbar */}
       <header className="sticky top-0 z-50 bg-white text-[#1A1A1A] border-b border-[#E5E7EB] shadow-xs flex-shrink-0">
         <div className="w-full px-4 sm:px-6">
@@ -162,9 +168,9 @@ export default function DashboardLayout({
 
       {/* Main Page Content */}
       <main
-        className={`flex-1 flex flex-col ${
+        className={`flex-1 flex flex-col min-h-0 ${
           pathname.startsWith('/conversations')
-            ? 'w-full h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
+            ? 'w-full p-0 overflow-hidden'
             : 'max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8'
         }`}
       >

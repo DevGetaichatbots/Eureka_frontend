@@ -38,6 +38,21 @@ export function formatKarachiTime(dateStr: string | null | undefined): string {
   }
 }
 
+/** Calendar day key in Asia/Karachi (YYYY-MM-DD) for grouping chat bubbles. */
+export function karachiDateKey(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Karachi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(dateStr));
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Formats date header divider (e.g. "Today", "Yesterday", or "28 Aug 2026")
  */
