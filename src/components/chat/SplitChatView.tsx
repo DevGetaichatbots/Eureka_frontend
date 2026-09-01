@@ -56,7 +56,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const searchParams = useSearchParams();
 
   // Selected conversation ID from URL or initialId
-  const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : initialId;
+  const parsedId = Number(searchParams.get('id'));
+  const urlId =
+    Number.isFinite(parsedId) && parsedId > 0 ? parsedId : initialId;
 
   // Conversations list state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -260,9 +262,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   // Filtered & Sorted conversations list
   const filteredConversations = useMemo(() => {
-    return conversations
+    const rows = conversations
       .filter((conv) => {
-        // Search query filter
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const name = (conv.contact?.profile_name || '').toLowerCase();
@@ -273,7 +274,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           }
         }
 
-        // Folder category filter
         if (selectedFolder === 'active') {
           if (!isWithin24Hours(conv.last_message_at)) return false;
         } else if (selectedFolder === 'unassigned') {
@@ -286,7 +286,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           if (!isWithin24Hours(conv.last_message_at)) return false;
         }
 
-        // Dropdown Chat filter
         if (chatFilter === 'active24h') {
           return isWithin24Hours(conv.last_message_at);
         }
@@ -301,6 +300,14 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         const timeB = new Date(b.last_message_at).getTime();
         return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
       });
+
+    const seen = new Set<string>();
+    return rows.filter((conv) => {
+      const key = String(conv.contact_id || conv.contact?.wa_id || conv.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder]);
 
   // Select a conversation and update URL
@@ -475,63 +482,89 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         {activeData ? (
           <>
             {/* Top Contact Header Bar matching reference screenshot */}
-            <div className="p-3.5 sm:px-6 border-b border-[#E5E7EB] flex items-center justify-between gap-3 bg-white shadow-xs z-10 flex-shrink-0">
-              {/* Left: Contact Identity & Assigned Agent Dropdown */}
+            <div className="px-3.5 sm:px-6 py-3 border-b border-[#E5E7EB] bg-white shadow-xs z-10 flex-shrink-0 space-y-2">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
                   {activeData.conversation.contact?.profile_name?.[0]?.toUpperCase() || 'W'}
                 </div>
-
-                <div className="min-w-0">
-                  <h2 className="text-sm font-bold text-[#1A1A1A] truncate leading-tight">
-                    {activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}
-                  </h2>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[11px] font-medium text-[#6B7280]">
-                      Assigned to:
-                    </span>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#D92228] bg-[#FDEBEC] px-2 py-0.5 rounded-md hover:bg-[#F5C2C4] transition-colors cursor-pointer"
-                    >
-                      <Bot className="w-3 h-3 text-[#D92228]" />
-                      <span>Eureka Jo AI Bot</span>
-                      <ChevronDown className="w-3 h-3 ml-0.5" />
-                    </button>
-                  </div>
+                <h2 className="text-sm font-bold text-[#1A1A1A] truncate flex-1 min-w-0">
+                  {activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}
+                </h2>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleRefreshThread}
+                    disabled={refreshingThread}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer disabled:opacity-60"
+                    title="Reload latest WhatsApp messages"
+                  >
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 text-[#D92228] ${
+                        refreshingThread ? 'animate-spin' : ''
+                      }`}
+                    />
+                    {refreshingThread ? 'Reloading' : 'Reload'}
+                  </button>
+                  <select
+                    value={messageRange}
+                    onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
+                    className="pl-2.5 pr-2 py-1.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
+                    title="Filter messages by date"
+                  >
+                    <option value="all">All messages</option>
+                    <option value="3">Last 3 days</option>
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="custom">Custom calendar</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="p-2 rounded-xl text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors"
+                    title="Snooze / Reminder"
+                  >
+                    <Clock className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-2 rounded-xl text-[#6B7280] hover:text-[#16A34A] hover:bg-emerald-50 transition-colors"
+                    title="Mark Resolved"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
+                    title="Add Tag"
+                  >
+                    <Tag className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDetails(!showDetails)}
+                    className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                      showDetails
+                        ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                        : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'
+                    }`}
+                    title="Toggle Contact CRM Drawer"
+                  >
+                    {showDetails ? (
+                      <PanelRightClose className="w-4 h-4" />
+                    ) : (
+                      <PanelRightOpen className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
               </div>
 
-              {/* Right: Quick CRM Actions matching screenshot */}
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={handleRefreshThread}
-                  disabled={refreshingThread}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer disabled:opacity-60"
-                  title="Reload latest WhatsApp messages"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 text-[#D92228] ${
-                      refreshingThread ? 'animate-spin' : ''
-                    }`}
-                  />
-                  {refreshingThread ? 'Reloading' : 'Reload'}
-                </button>
-
-                <select
-                  value={messageRange}
-                  onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
-                  className="pl-2.5 pr-2 py-1.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
-                  title="Filter messages by date"
-                >
-                  <option value="all">All messages</option>
-                  <option value="3">Last 3 days</option>
-                  <option value="7">Last 7 days</option>
-                  <option value="30">Last 30 days</option>
-                  <option value="custom">Custom calendar</option>
-                </select>
-
+              <div className="flex flex-wrap items-center gap-2 pl-[3.25rem]">
+                <span className="text-[11px] font-medium text-[#6B7280] whitespace-nowrap">
+                  Assigned to:
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#D92228] bg-[#FDEBEC] px-2 py-0.5 rounded-md whitespace-nowrap">
+                  <Bot className="w-3 h-3" />
+                  Eureka Jo AI Bot
+                </span>
                 {messageRange === 'custom' && (
                   <span className="flex items-center gap-1">
                     <input
@@ -551,48 +584,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                     />
                   </span>
                 )}
-
-                <button
-                  type="button"
-                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors"
-                  title="Snooze / Reminder"
-                >
-                  <Clock className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#16A34A] hover:bg-emerald-50 transition-colors"
-                  title="Mark Resolved"
-                >
-                  <Check className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
-                  title="Add Tag"
-                >
-                  <Tag className="w-4 h-4" />
-                </button>
-
-                {/* Toggle Right Contact Details Drawer */}
-                <button
-                  type="button"
-                  onClick={() => setShowDetails(!showDetails)}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                    showDetails
-                      ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
-                      : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'
-                  }`}
-                  title="Toggle Contact CRM Drawer"
-                >
-                  {showDetails ? (
-                    <PanelRightClose className="w-4 h-4" />
-                  ) : (
-                    <PanelRightOpen className="w-4 h-4" />
-                  )}
-                </button>
               </div>
             </div>
 
