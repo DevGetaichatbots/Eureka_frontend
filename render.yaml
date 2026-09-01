@@ -2,8 +2,8 @@ services:
   - type: web
     name: eureka-frontend
     runtime: node
-    buildCommand: npm install && npm run build
-    startCommand: node .next/standalone/server.js
+    buildCommand: npm install && npm run build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/
+    startCommand: HOSTNAME=0.0.0.0 PORT=10000 node .next/standalone/server.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -16,4 +16,4 @@ services:
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bXducXJtZmVyc2hzcGZrY3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5MTIyNTcsImV4cCI6MjA4NDQ4ODI1N30.wXVyh3D-TXq2G9t5cqs3NkaeJXOcMgczOpJlxH8TB8A
       - key: PORT
-        value: "3000"
+        value: "10000"
