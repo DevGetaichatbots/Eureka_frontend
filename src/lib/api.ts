@@ -32,7 +32,11 @@ class ApiClient {
 
     const res = await fetch(url, {
       ...options,
-      headers,
+      headers: {
+        ...headers,
+        'Cache-Control': 'no-cache',
+      },
+      cache: 'no-store',
       credentials: 'include',
     });
 

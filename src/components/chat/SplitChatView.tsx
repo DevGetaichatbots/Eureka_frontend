@@ -80,6 +80,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   } | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [refreshingThread, setRefreshingThread] = useState(false);
+  const [messageRange, setMessageRange] = useState<'all' | '3' | '7' | '30' | 'custom'>('all');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   // Lightbox
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -110,8 +113,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     loadConversations(true);
     // Poll every 4 seconds so newly received WhatsApp messages appear live
     const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       loadConversations(false);
-    }, 4000);
+    }, 2000);
     return () => clearInterval(timer);
   }, []);
 
@@ -127,15 +131,21 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         const data = await api.getConversation(selectedId!);
         if (isMounted) {
           setActiveData((prev) => {
-            const prevLast = prev?.messages?.[prev.messages.length - 1];
-            const nextLast = data?.messages?.[data.messages.length - 1];
+            const prevMax = prev?.messages?.length
+              ? Math.max(...prev.messages.map((m) => m.id || 0))
+              : 0;
+            const nextMax = data?.messages?.length
+              ? Math.max(...data.messages.map((m) => m.id || 0))
+              : 0;
             if (
               prev &&
               prev.messages.length === data.messages.length &&
-              prevLast?.id === nextLast?.id &&
-              prev.conversation.last_message_at === data.conversation.last_message_at
+              prevMax === nextMax
             ) {
               return prev;
+            }
+            if (nextMax > prevMax) {
+              stickToBottomRef.current = true;
             }
             return data;
           });
@@ -150,8 +160,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     fetchThread(true);
 
     const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       fetchThread(false);
-    }, 3000);
+    }, 2000);
 
     return () => {
       isMounted = false;
@@ -159,15 +170,17 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     };
   }, [selectedId]);
 
-  // Refresh thread handler
   const handleRefreshThread = async () => {
-    if (!selectedId) return;
     try {
       setRefreshingThread(true);
-      const data = await api.getConversation(selectedId);
-      setActiveData(data);
+      stickToBottomRef.current = true;
+      await loadConversations(false);
+      if (selectedId) {
+        const data = await api.getConversation(selectedId);
+        setActiveData(data);
+      }
     } catch (err) {
-      console.error('Failed to refresh thread:', err);
+      console.error('Failed to reload conversation:', err);
     } finally {
       setRefreshingThread(false);
     }
@@ -175,16 +188,25 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   const sortedMessages = useMemo(() => {
     if (!activeData?.messages?.length) return [];
-    return [...activeData.messages].sort((a, b) => {
-      const ta = new Date(a.sent_at || a.created_at).getTime();
-      const tb = new Date(b.sent_at || b.created_at).getTime();
-      if (ta !== tb) return ta - tb;
-      const ca = new Date(a.created_at || a.sent_at).getTime();
-      const cb = new Date(b.created_at || b.sent_at).getTime();
-      if (ca !== cb) return ca - cb;
-      return (a.id || 0) - (b.id || 0);
-    });
-  }, [activeData?.messages]);
+    const ordered = [...activeData.messages].sort((a, b) => (a.id || 0) - (b.id || 0));
+    const ts = (m: Message) => new Date(m.sent_at || m.created_at).getTime();
+
+    if (messageRange === 'all') return ordered;
+
+    if (messageRange === 'custom') {
+      if (!customStart && !customEnd) return ordered;
+      const start = customStart ? new Date(`${customStart}T00:00:00`).getTime() : 0;
+      const end = customEnd ? new Date(`${customEnd}T23:59:59`).getTime() : Number.MAX_SAFE_INTEGER;
+      return ordered.filter((m) => {
+        const t = ts(m);
+        return t >= start && t <= end;
+      });
+    }
+
+    const days = Number(messageRange);
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return ordered.filter((m) => ts(m) >= cutoff);
+  }, [activeData?.messages, messageRange, customStart, customEnd]);
 
   const isNearBottom = (el: HTMLDivElement) =>
     el.scrollHeight - el.scrollTop - el.clientHeight < 96;
@@ -217,7 +239,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     const hasNewMessage = key !== lastMessageKeyRef.current;
     lastMessageKeyRef.current = key;
 
-    if (hasNewMessage && stickToBottomRef.current) {
+    if (hasNewMessage) {
+      stickToBottomRef.current = true;
       el.scrollTop = el.scrollHeight;
     }
   }, [sortedMessages, selectedId]);
@@ -428,7 +451,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                           {contactName}
                         </h3>
                         <span className="text-[10px] text-[#9CA3AF] whitespace-nowrap flex-shrink-0 font-mono">
-                          {formatKarachiTime(conv.last_message_at)}
+                          {formatKarachiTime(lastMsg?.sent_at || lastMsg?.created_at || conv.last_message_at)}
                         </span>
                       </div>
 
@@ -485,15 +508,49 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                   type="button"
                   onClick={handleRefreshThread}
                   disabled={refreshingThread}
-                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors cursor-pointer"
-                  title="Refresh Conversation"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer disabled:opacity-60"
+                  title="Reload latest WhatsApp messages"
                 >
                   <RefreshCw
-                    className={`w-4 h-4 text-[#D92228] ${
+                    className={`w-3.5 h-3.5 text-[#D92228] ${
                       refreshingThread ? 'animate-spin' : ''
                     }`}
                   />
+                  {refreshingThread ? 'Reloading' : 'Reload'}
                 </button>
+
+                <select
+                  value={messageRange}
+                  onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
+                  className="pl-2.5 pr-2 py-1.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
+                  title="Filter messages by date"
+                >
+                  <option value="all">All messages</option>
+                  <option value="3">Last 3 days</option>
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="custom">Custom calendar</option>
+                </select>
+
+                {messageRange === 'custom' && (
+                  <span className="flex items-center gap-1">
+                    <input
+                      type="date"
+                      value={customStart}
+                      onChange={(e) => setCustomStart(e.target.value)}
+                      className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
+                      title="Start date"
+                    />
+                    <span className="text-[10px] text-[#9CA3AF]">to</span>
+                    <input
+                      type="date"
+                      value={customEnd}
+                      onChange={(e) => setCustomEnd(e.target.value)}
+                      className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
+                      title="End date"
+                    />
+                  </span>
+                )}
 
                 <button
                   type="button"
