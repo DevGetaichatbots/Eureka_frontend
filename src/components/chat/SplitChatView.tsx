@@ -603,7 +603,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                   <select
                     value={messageRange}
                     onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
-                    className="pl-2.5 pr-2 py-1.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
+                    className={`pl-2.5 pr-2 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer transition-colors ${
+                      messageRange !== 'all'
+                        ? 'border-[#D92228] bg-[#FDEBEC] text-[#D92228]'
+                        : 'border-[#E5E7EB] bg-white text-[#1A1A1A]'
+                    }`}
                     title="Filter messages by date"
                   >
                     <option value="all">All messages</option>
@@ -612,6 +616,16 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                     <option value="30">Last 30 days</option>
                     <option value="custom">Custom calendar</option>
                   </select>
+                  {messageRange !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => { setMessageRange('all'); setCustomStart(''); setCustomEnd(''); }}
+                      className="p-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] hover:bg-[#F5C2C4] transition-colors"
+                      title="Clear date filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="p-2 rounded-xl text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors"
@@ -677,6 +691,13 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                       className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
                       title="End date"
                     />
+                  </span>
+                )}
+                {/* Filter result count — always visible when filter is active so user can see it working */}
+                {messageRange !== 'all' && activeData?.messages?.length != null && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FDEBEC] text-[#D92228] border border-[#F5C2C4] whitespace-nowrap">
+                    <Filter className="w-2.5 h-2.5" />
+                    {sortedMessages.length} / {activeData.messages.length} messages
                   </span>
                 )}
               </div>
