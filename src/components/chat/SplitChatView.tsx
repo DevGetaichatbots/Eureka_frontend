@@ -84,7 +84,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [loadingThread, setLoadingThread] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [refreshingThread, setRefreshingThread] = useState(false);
-  const [messageRange, setMessageRange] = useState<'all' | '3' | '7' | '30' | 'custom'>('all');
+  const [messageRange, setMessageRange] = useState<'all' | 'today' | 'yesterday' | '3' | '7' | '30' | 'custom'>('all');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
 
@@ -210,6 +210,33 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     const ordered = [...activeData.messages].sort((a, b) => (a.id || 0) - (b.id || 0));
 
     if (messageRange === 'all') return ordered;
+
+    // Helper: get today's date key in Karachi timezone
+    const todayKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Karachi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    if (messageRange === 'today') {
+      return ordered.filter((m) => karachiDateKey(m.sent_at || m.created_at) === todayKey);
+    }
+
+    if (messageRange === 'yesterday') {
+      const yd = new Date();
+      yd.setDate(yd.getDate() - 1);
+      const yesterdayKey = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Karachi',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(yd);
+      return ordered.filter((m) => {
+        const d = karachiDateKey(m.sent_at || m.created_at);
+        return d === todayKey || d === yesterdayKey;
+      });
+    }
 
     if (messageRange === 'custom') {
       if (!customStart && !customEnd) return ordered;
@@ -611,6 +638,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                     title="Filter messages by date"
                   >
                     <option value="all">All messages</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
                     <option value="3">Last 3 days</option>
                     <option value="7">Last 7 days</option>
                     <option value="30">Last 30 days</option>
