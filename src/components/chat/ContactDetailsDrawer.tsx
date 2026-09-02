@@ -10,9 +10,6 @@ import {
   Calendar,
   Clock,
   MessageSquare,
-  Building,
-  DollarSign,
-  MapPin,
 } from 'lucide-react';
 
 interface ContactDetailsDrawerProps {
@@ -68,18 +65,6 @@ export function ContactDetailsDrawer({
           <p className="font-mono text-xs text-[#6B7280] mt-0.5">+{contact?.wa_id}</p>
         </div>
 
-        {/* Opted-In Channel */}
-        <div className="pt-4 border-t border-[#E5E7EB] space-y-1 text-xs">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
-            Opted-In Through
-          </label>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#F9FAFB] border border-[#E5E7EB] text-[#1A1A1A]">
-              Direct WhatsApp Inbound
-            </span>
-          </div>
-        </div>
-
         {/* System Fields */}
         <div className="pt-4 border-t border-[#E5E7EB] space-y-3 text-xs">
           <h5 className="font-bold text-xs uppercase tracking-wider text-[#6B7280]">
@@ -115,42 +100,6 @@ export function ContactDetailsDrawer({
             <div className="flex items-center gap-2 text-[#1A1A1A]">
               <MessageSquare className="w-3.5 h-3.5 text-[#D92228]" />
               <span>{totalMessages} messages</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Real Estate Custom Fields */}
-        <div className="pt-4 border-t border-[#E5E7EB] space-y-3 text-xs">
-          <div className="flex items-center justify-between">
-            <h5 className="font-bold text-xs uppercase tracking-wider text-[#6B7280]">
-              Real Estate Fields
-            </h5>
-            <span className="text-[10px] text-[#D92228] cursor-pointer hover:underline">
-              Manage Fields
-            </span>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium text-[#6B7280]">Preferred Location</label>
-            <div className="flex items-center gap-2 text-[#1A1A1A] font-semibold">
-              <MapPin className="w-3.5 h-3.5 text-[#D92228]" />
-              <span>Amman, Jordan (Abdoun / Dabouq)</span>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium text-[#6B7280]">Property Category</label>
-            <div className="flex items-center gap-2 text-[#1A1A1A] font-semibold">
-              <Building className="w-3.5 h-3.5 text-[#D92228]" />
-              <span>3-Bedroom Luxury Apartment</span>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium text-[#6B7280]">Budget Range</label>
-            <div className="flex items-center gap-2 text-[#1A1A1A] font-semibold">
-              <DollarSign className="w-3.5 h-3.5 text-[#16A34A]" />
-              <span>80,000 – 130,000 JOD</span>
             </div>
           </div>
         </div>
