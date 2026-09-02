@@ -208,32 +208,37 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const sortedMessages = useMemo(() => {
     if (!activeData?.messages?.length) return [];
     const ordered = [...activeData.messages].sort((a, b) => (a.id || 0) - (b.id || 0));
-    const ts = (m: Message) => new Date(m.sent_at || m.created_at).getTime();
 
     if (messageRange === 'all') return ordered;
 
     if (messageRange === 'custom') {
       if (!customStart && !customEnd) return ordered;
-      // Treat custom date inputs as local Karachi time boundaries
-      const start = customStart ? new Date(`${customStart}T00:00:00+05:00`).getTime() : 0;
-      const end = customEnd ? new Date(`${customEnd}T23:59:59+05:00`).getTime() : Number.MAX_SAFE_INTEGER;
+      // Compare using Karachi date strings (YYYY-MM-DD) so timezone is handled correctly
       return ordered.filter((m) => {
-        const t = ts(m);
-        return t >= start && t <= end;
+        const msgDate = karachiDateKey(m.sent_at || m.created_at);
+        if (!msgDate) return false;
+        if (customStart && msgDate < customStart) return false;
+        if (customEnd && msgDate > customEnd) return false;
+        return true;
       });
     }
 
+    // Numeric range: "Last N days" — compare Karachi date strings
     const days = Number(messageRange);
-    // Use start-of-day boundary in Karachi time so "Last N days" means full calendar days
-    const now = new Date();
-    const karachiOffsetMs = 5 * 60 * 60 * 1000;
-    const karachiNow = new Date(now.getTime() + karachiOffsetMs);
-    // Set to start of today (midnight) in Karachi, then subtract (days-1) full days
-    const karachiMidnight = new Date(
-      Date.UTC(karachiNow.getUTCFullYear(), karachiNow.getUTCMonth(), karachiNow.getUTCDate())
-    );
-    const cutoff = karachiMidnight.getTime() - karachiOffsetMs - (days - 1) * 24 * 60 * 60 * 1000;
-    return ordered.filter((m) => ts(m) >= cutoff);
+    // Build the cutoff date key: today minus (days-1) days, expressed as YYYY-MM-DD in PKT
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
+    const cutoffKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Karachi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(cutoffDate);
+
+    return ordered.filter((m) => {
+      const msgDate = karachiDateKey(m.sent_at || m.created_at);
+      return !!msgDate && msgDate >= cutoffKey;
+    });
   }, [activeData?.messages, messageRange, customStart, customEnd]);
 
   const isNearBottom = (el: HTMLDivElement) =>
@@ -459,63 +464,110 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               <p className="text-[11px] text-[#6B7280] mt-1">Try resetting your filters</p>
             </div>
           ) : (
-            filteredConversations.map((conv) => {
-              const isSelected = conv.id === selectedId;
-              const contactName = conv.contact?.profile_name || 'WhatsApp Contact';
-              const active = isWithin24Hours(conv.last_message_at);
-              const lastMsg = conv.last_message;
-              const isBotMsg = lastMsg?.direction === 'bot';
+            (() => {
+              // Build Today / Yesterday / date-string group dividers (WhatsApp-style)
+              const todayKey = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Karachi',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+              }).format(new Date());
+              const yesterdayDate = new Date();
+              yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+              const yesterdayKey = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Karachi',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+              }).format(yesterdayDate);
 
-              return (
-                <div
-                  key={conv.id}
-                  onClick={() => handleSelectConversation(conv.id)}
-                  className={`p-3.5 transition-all cursor-pointer relative ${
-                    isSelected
-                      ? 'bg-[#FDEBEC]/40 border-l-4 border-[#D92228]'
-                      : 'bg-white hover:bg-[#F9FAFB]'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Contact Avatar */}
-                    <div className="relative flex-shrink-0 mt-0.5">
-                      <div className="w-10 h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center border border-[#F5C2C4]">
-                        {contactName[0]?.toUpperCase() || 'W'}
-                      </div>
-                      {active && (
-                        <span
-                          className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white ring-1 ring-[#16A34A]/20"
-                          title="Active 24h Customer Window"
-                        />
-                      )}
+              const getGroupLabel = (dateKey: string) => {
+                if (dateKey === todayKey) return 'Today';
+                if (dateKey === yesterdayKey) return 'Yesterday';
+                // e.g. "30 Aug 2026"
+                try {
+                  return new Intl.DateTimeFormat('en-GB', {
+                    timeZone: 'Asia/Karachi',
+                    day: 'numeric', month: 'long', year: 'numeric',
+                  }).format(new Date(dateKey));
+                } catch { return dateKey; }
+              };
+
+              let lastGroupKey = '';
+              const items: React.ReactNode[] = [];
+
+              filteredConversations.forEach((conv) => {
+                const isSelected = conv.id === selectedId;
+                const contactName = conv.contact?.profile_name || 'WhatsApp Contact';
+                const active = isWithin24Hours(conv.last_message_at);
+                const lastMsg = conv.last_message;
+                const isBotMsg = lastMsg?.direction === 'bot';
+                const groupKey = karachiDateKey(conv.last_message_at);
+
+                // Insert a date divider when the group changes
+                if (groupKey && groupKey !== lastGroupKey) {
+                  lastGroupKey = groupKey;
+                  items.push(
+                    <div
+                      key={`divider-${groupKey}`}
+                      className="sticky top-0 z-10 px-4 py-1 bg-[#F3F4F6] border-y border-[#E5E7EB] flex items-center justify-center"
+                    >
+                      <span className="text-[10px] font-semibold text-[#6B7280] tracking-wide uppercase">
+                        {getGroupLabel(groupKey)}
+                      </span>
                     </div>
+                  );
+                }
 
-                    {/* Contact Info & Message Snippet */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between gap-1 mb-0.5">
-                        <h3
-                          className={`text-xs font-bold truncate ${
-                            isSelected ? 'text-[#D92228]' : 'text-[#1A1A1A]'
-                          }`}
-                        >
-                          {contactName}
-                        </h3>
-                        <span className="text-[10px] text-[#9CA3AF] whitespace-nowrap flex-shrink-0 font-mono">
-                          {formatKarachiTime(lastMsg?.sent_at || lastMsg?.created_at || conv.last_message_at)}
-                        </span>
+                items.push(
+                  <div
+                    key={conv.id}
+                    onClick={() => handleSelectConversation(conv.id)}
+                    className={`p-3.5 transition-all cursor-pointer relative ${
+                      isSelected
+                        ? 'bg-[#FDEBEC]/40 border-l-4 border-[#D92228]'
+                        : 'bg-white hover:bg-[#F9FAFB]'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Contact Avatar */}
+                      <div className="relative flex-shrink-0 mt-0.5">
+                        <div className="w-10 h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center border border-[#F5C2C4]">
+                          {contactName[0]?.toUpperCase() || 'W'}
+                        </div>
+                        {active && (
+                          <span
+                            className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#16A34A] border-2 border-white ring-1 ring-[#16A34A]/20"
+                            title="Active 24h Customer Window"
+                          />
+                        )}
                       </div>
 
-                      <p className="text-xs text-[#6B7280] truncate leading-relaxed">
-                        {isBotMsg ? (
-                          <span className="text-[#D92228] font-medium mr-1">You:</span>
-                        ) : null}
-                        {lastMsg?.body || 'Attachment'}
-                      </p>
+                      {/* Contact Info & Message Snippet */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-1 mb-0.5">
+                          <h3
+                            className={`text-xs font-bold truncate ${
+                              isSelected ? 'text-[#D92228]' : 'text-[#1A1A1A]'
+                            }`}
+                          >
+                            {contactName}
+                          </h3>
+                          <span className="text-[10px] text-[#9CA3AF] whitespace-nowrap flex-shrink-0 font-mono">
+                            {formatKarachiTime(lastMsg?.sent_at || lastMsg?.created_at || conv.last_message_at)}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-[#6B7280] truncate leading-relaxed">
+                          {isBotMsg ? (
+                            <span className="text-[#D92228] font-medium mr-1">You:</span>
+                          ) : null}
+                          {lastMsg?.body || 'Attachment'}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              });
+
+              return <>{items}</>;
+            })()
           )}
         </div>
       </div>
