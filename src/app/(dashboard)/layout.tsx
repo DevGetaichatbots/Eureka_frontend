@@ -1,18 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   MessageSquare,
   Search,
   Users,
-  AlertTriangle,
   ShieldAlert,
   LogOut,
   Bot,
-  User as UserIcon,
   Loader2,
 } from 'lucide-react';
 
@@ -23,6 +21,18 @@ export default function DashboardLayout({
 }) {
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+  const [navSearch, setNavSearch] = useState('');
+
+  const handleNavSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = navSearch.trim();
+    if (q) {
+      router.push(`/search?q=${encodeURIComponent(q)}`);
+    } else {
+      router.push('/search');
+    }
+  };
 
   if (loading) {
     return (
@@ -76,17 +86,24 @@ export default function DashboardLayout({
 
             {/* Centered Omnichannel Search Bar */}
             <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
-              <Link href="/conversations" className="w-full">
+              <form onSubmit={handleNavSearch} className="w-full">
                 <div className="relative w-full group">
-                  <Search className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#D92228] absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors" />
-                  <div className="w-full pl-9 pr-4 py-1.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] group-hover:bg-white text-xs text-[#6B7280] group-hover:text-[#1A1A1A] transition-all shadow-xs flex items-center justify-between">
-                    <span>Search through Inbox conversations...</span>
-                    <kbd className="hidden sm:inline-block text-[10px] font-mono text-[#9CA3AF] bg-white border border-[#E5E7EB] px-1.5 py-0.2 rounded">
-                      ⌘K
-                    </kbd>
-                  </div>
+                  <button type="submit" className="absolute left-3.5 top-1/2 -translate-y-1/2 cursor-pointer">
+                    <Search className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#D92228] transition-colors" />
+                  </button>
+                  <input
+                    type="text"
+                    value={navSearch}
+                    onChange={(e) => setNavSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') setNavSearch(''); }}
+                    placeholder="Search through Inbox conversations..."
+                    className="w-full pl-9 pr-10 py-1.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] focus:bg-white focus:border-[#D92228] focus:outline-none text-xs text-[#1A1A1A] placeholder:text-[#9CA3AF] transition-all shadow-xs"
+                  />
+                  <kbd className="hidden sm:inline-block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#9CA3AF] bg-white border border-[#E5E7EB] px-1.5 py-0.5 rounded pointer-events-none">
+                    ↵
+                  </kbd>
                 </div>
-              </Link>
+              </form>
             </div>
 
             {/* Navigation Tabs & Actions */}
