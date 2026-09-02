@@ -1,12 +1,24 @@
 import * as XLSX from 'xlsx';
-import { MOCK_CONTACTS } from '@/lib/mockData';
 import { formatKarachiDateTime, formatPhone } from '@/lib/utils';
+import { Contact } from '@/types';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q')?.trim().toLowerCase() || '';
 
-  let contacts = MOCK_CONTACTS;
+  let contacts: Contact[] = [];
+
+  try {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const res = await fetch(`${backendUrl}/api/leads`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      contacts = data.items || data.leads || [];
+    }
+  } catch (err) {
+    console.error('Error fetching live contacts for XLSX export:', err);
+  }
+
   if (q) {
     const digits = q.replace(/\D/g, '');
     contacts = contacts.filter((c) => {
