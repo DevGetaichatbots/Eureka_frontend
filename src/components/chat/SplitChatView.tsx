@@ -132,9 +132,12 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
     let isMounted = true;
 
-    // Clear stale data from previous conversation immediately
+    // Clear stale data and reset message filters when switching conversations
     setActiveData(null);
     setThreadError(null);
+    setMessageRange('all');
+    setCustomStart('');
+    setCustomEnd('');
 
     async function fetchThread(showSpinner = false) {
       try {
@@ -211,8 +214,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
     if (messageRange === 'custom') {
       if (!customStart && !customEnd) return ordered;
-      const start = customStart ? new Date(`${customStart}T00:00:00`).getTime() : 0;
-      const end = customEnd ? new Date(`${customEnd}T23:59:59`).getTime() : Number.MAX_SAFE_INTEGER;
+      // Treat custom date inputs as local Karachi time boundaries
+      const start = customStart ? new Date(`${customStart}T00:00:00+05:00`).getTime() : 0;
+      const end = customEnd ? new Date(`${customEnd}T23:59:59+05:00`).getTime() : Number.MAX_SAFE_INTEGER;
       return ordered.filter((m) => {
         const t = ts(m);
         return t >= start && t <= end;
@@ -220,7 +224,15 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     }
 
     const days = Number(messageRange);
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    // Use start-of-day boundary in Karachi time so "Last N days" means full calendar days
+    const now = new Date();
+    const karachiOffsetMs = 5 * 60 * 60 * 1000;
+    const karachiNow = new Date(now.getTime() + karachiOffsetMs);
+    // Set to start of today (midnight) in Karachi, then subtract (days-1) full days
+    const karachiMidnight = new Date(
+      Date.UTC(karachiNow.getUTCFullYear(), karachiNow.getUTCMonth(), karachiNow.getUTCDate())
+    );
+    const cutoff = karachiMidnight.getTime() - karachiOffsetMs - (days - 1) * 24 * 60 * 60 * 1000;
     return ordered.filter((m) => ts(m) >= cutoff);
   }, [activeData?.messages, messageRange, customStart, customEnd]);
 
