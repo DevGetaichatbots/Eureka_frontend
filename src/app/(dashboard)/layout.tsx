@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
+import { Toast } from '@/components/ui/Toast';
 import {
   MessageSquare,
   Search,
@@ -23,6 +25,8 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [navSearch, setNavSearch] = useState('');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showLogoutToast, setShowLogoutToast] = useState(false);
 
   const handleNavSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +36,13 @@ export default function DashboardLayout({
     } else {
       router.push('/search');
     }
+  };
+
+  const handleLogoutConfirm = async () => {
+    setShowLogoutModal(false);
+    setShowLogoutToast(true);
+    // Small delay so toast is visible before redirect
+    setTimeout(() => logout(), 1200);
   };
 
   if (loading) {
@@ -146,7 +157,7 @@ export default function DashboardLayout({
                 </div>
 
                 <button
-                  onClick={() => logout()}
+                  onClick={() => setShowLogoutModal(true)}
                   title="Log Out"
                   className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors cursor-pointer"
                 >
@@ -191,8 +202,26 @@ export default function DashboardLayout({
             : 'max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8'
         }`}
       >
-        {children}
+          {children}
       </main>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <LogoutConfirmModal
+          onConfirm={handleLogoutConfirm}
+          onCancel={() => setShowLogoutModal(false)}
+        />
+      )}
+
+      {/* Logout Toast */}
+      {showLogoutToast && (
+        <Toast
+          message="You have been signed out successfully."
+          variant="success"
+          duration={2000}
+          onClose={() => setShowLogoutToast(false)}
+        />
+      )}
     </div>
   );
 }
