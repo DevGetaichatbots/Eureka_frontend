@@ -36,7 +36,7 @@ class ApiClient {
       },
       cache: 'no-store',
       credentials: 'include',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(25000),
     });
 
     if (res.status === 401 && typeof window !== 'undefined') {

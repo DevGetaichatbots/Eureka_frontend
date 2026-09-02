@@ -102,15 +102,13 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     try {
       if (showLoading) setLoadingList(true);
       const res = await api.getConversations();
-      setConversations(res.items);
+      setConversations(res.items || []);
       setListError(null);
 
-      // If no selectedId, default to the latest conversation
       setSelectedId((prev) => (prev ? prev : (res.items.length > 0 ? res.items[0].id : null)));
     } catch (err: any) {
       console.error('Failed to load conversations:', err);
-      // Only set error if we have no data yet (don't overwrite existing data on poll failures)
-      if (conversations.length === 0) {
+      if (showLoading) {
         setListError(err?.message || 'Failed to load conversations. Check your connection.');
       }
     } finally {
