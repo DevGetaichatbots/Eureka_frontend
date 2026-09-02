@@ -97,6 +97,14 @@ export default function UsersPage() {
     [users]
   );
 
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1A1A1A] dark:text-white">Staff Management</h1>
+          <p className="text-sm text-[#6B7280]">Manage user access and system permissions</p>
+        </div>
+
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleRefresh}
