@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
+import { ChangePasswordModal } from '@/components/users/ChangePasswordModal';
 import { Toast } from '@/components/ui/Toast';
 import {
   MessageSquare,
@@ -13,6 +14,7 @@ import {
   LogOut,
   Bot,
   Loader2,
+  KeyRound,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -24,6 +26,8 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showLogoutToast, setShowLogoutToast] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleLogoutConfirm = async () => {
     setShowLogoutModal(false);
@@ -110,16 +114,32 @@ export default function DashboardLayout({
 
               {/* User Session & Logout */}
               <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-2 py-1 px-2.5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                  <div className="w-6 h-6 rounded-full bg-[#FDEBEC] text-[#D92228] flex items-center justify-center font-bold text-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(true)}
+                  title="Click to update password"
+                  className="hidden sm:flex items-center gap-2 py-1 px-2.5 rounded-xl bg-[#F9FAFB] hover:bg-white border border-[#E5E7EB] hover:border-[#D92228] transition-all cursor-pointer group shadow-xs"
+                >
+                  <div className="w-6 h-6 rounded-full bg-[#FDEBEC] text-[#D92228] flex items-center justify-center font-bold text-xs group-hover:scale-105 transition-transform">
                     {user.email[0]?.toUpperCase() || 'U'}
                   </div>
                   <div className="text-left text-xs">
-                    <p className="font-semibold text-[#1A1A1A] truncate max-w-[120px]">
+                    <p className="font-semibold text-[#1A1A1A] group-hover:text-[#D92228] truncate max-w-[120px] transition-colors">
                       {user.email.split('@')[0]}
                     </p>
                   </div>
-                </div>
+                  <KeyRound className="w-3 h-3 text-[#9CA3AF] group-hover:text-[#D92228] transition-colors" />
+                </button>
+
+                {/* Mobile Password Change Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(true)}
+                  title="Update Password"
+                  className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors cursor-pointer sm:hidden"
+                >
+                  <KeyRound className="w-4 h-4" />
+                </button>
 
                 <button
                   onClick={() => setShowLogoutModal(true)}
@@ -185,6 +205,28 @@ export default function DashboardLayout({
           variant="success"
           duration={2000}
           onClose={() => setShowLogoutToast(false)}
+        />
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && user && (
+        <ChangePasswordModal
+          user={user}
+          isOpen={showPasswordModal}
+          onClose={() => setShowPasswordModal(false)}
+          onSuccess={(msg) => {
+            setToastMessage(msg);
+          }}
+        />
+      )}
+
+      {/* Success Toast for Password Update */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          variant="success"
+          duration={3500}
+          onClose={() => setToastMessage(null)}
         />
       )}
     </div>

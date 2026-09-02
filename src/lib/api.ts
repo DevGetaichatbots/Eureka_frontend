@@ -86,6 +86,13 @@ class ApiClient {
     }
   }
 
+  async changePassword(data: { current_password: string; new_password: string }): Promise<{ success: boolean; message: string }> {
+    return this.fetch<{ success: boolean; message: string }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Conversations
   async getConversations(page = 1, limit = 50): Promise<PaginatedResponse<Conversation>> {
     return await this.fetch<PaginatedResponse<Conversation>>(`/api/conversations?page=${page}&limit=${limit}`);
