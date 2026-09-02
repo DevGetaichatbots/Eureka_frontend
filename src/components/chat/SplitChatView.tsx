@@ -647,27 +647,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                   )}
                   <button
                     type="button"
-                    className="p-2 rounded-xl text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors"
-                    title="Snooze / Reminder"
-                  >
-                    <Clock className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="p-2 rounded-xl text-[#6B7280] hover:text-[#16A34A] hover:bg-emerald-50 transition-colors"
-                    title="Mark Resolved"
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
-                    title="Add Tag"
-                  >
-                    <Tag className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setShowDetails(!showDetails)}
                     className={`p-2 rounded-xl border transition-all cursor-pointer ${
                       showDetails
@@ -685,41 +664,36 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 pl-[3.25rem]">
-                <span className="text-[11px] font-medium text-[#6B7280] whitespace-nowrap">
-                  Assigned to:
-                </span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#D92228] bg-[#FDEBEC] px-2 py-0.5 rounded-md whitespace-nowrap">
-                  <Bot className="w-3 h-3" />
-                  Eureka Jo AI Bot
-                </span>
-                {messageRange === 'custom' && (
-                  <span className="flex items-center gap-1">
-                    <input
-                      type="date"
-                      value={customStart}
-                      onChange={(e) => setCustomStart(e.target.value)}
-                      className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
-                      title="Start date"
-                    />
-                    <span className="text-[10px] text-[#9CA3AF]">to</span>
-                    <input
-                      type="date"
-                      value={customEnd}
-                      onChange={(e) => setCustomEnd(e.target.value)}
-                      className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
-                      title="End date"
-                    />
-                  </span>
-                )}
-                {/* Filter result count — always visible when filter is active so user can see it working */}
-                {messageRange !== 'all' && activeData?.messages?.length != null && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FDEBEC] text-[#D92228] border border-[#F5C2C4] whitespace-nowrap">
-                    <Filter className="w-2.5 h-2.5" />
-                    {sortedMessages.length} / {activeData.messages.length} messages
-                  </span>
-                )}
-              </div>
+              {messageRange !== 'all' && (
+                <div className="flex flex-wrap items-center gap-2 pl-[3.25rem]">
+                  {messageRange === 'custom' && (
+                    <span className="flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={customStart}
+                        onChange={(e) => setCustomStart(e.target.value)}
+                        className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
+                        title="Start date"
+                      />
+                      <span className="text-[10px] text-[#9CA3AF]">to</span>
+                      <input
+                        type="date"
+                        value={customEnd}
+                        onChange={(e) => setCustomEnd(e.target.value)}
+                        className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
+                        title="End date"
+                      />
+                    </span>
+                  )}
+                  {/* Filter result count — always visible when filter is active so user can see it working */}
+                  {activeData?.messages?.length != null && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FDEBEC] text-[#D92228] border border-[#F5C2C4] whitespace-nowrap">
+                      <Filter className="w-2.5 h-2.5" />
+                      {sortedMessages.length} / {activeData.messages.length} messages
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Platform Tab Indicator Banner matching reference screenshot */}
