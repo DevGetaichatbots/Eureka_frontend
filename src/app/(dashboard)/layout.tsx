@@ -2,13 +2,12 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
 import { Toast } from '@/components/ui/Toast';
 import {
   MessageSquare,
-  Search,
   Users,
   ShieldAlert,
   LogOut,
@@ -23,20 +22,8 @@ export default function DashboardLayout({
 }) {
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
-  const [navSearch, setNavSearch] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showLogoutToast, setShowLogoutToast] = useState(false);
-
-  const handleNavSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = navSearch.trim();
-    if (q) {
-      router.push(`/search?q=${encodeURIComponent(q)}`);
-    } else {
-      router.push('/search');
-    }
-  };
 
   const handleLogoutConfirm = async () => {
     setShowLogoutModal(false);
@@ -93,28 +80,6 @@ export default function DashboardLayout({
                   CRM INBOX
                 </span>
               </div>
-            </div>
-
-            {/* Centered Omnichannel Search Bar */}
-            <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
-              <form onSubmit={handleNavSearch} className="w-full">
-                <div className="relative w-full group">
-                  <button type="submit" className="absolute left-3.5 top-1/2 -translate-y-1/2 cursor-pointer">
-                    <Search className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#D92228] transition-colors" />
-                  </button>
-                  <input
-                    type="text"
-                    value={navSearch}
-                    onChange={(e) => setNavSearch(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Escape') setNavSearch(''); }}
-                    placeholder="Search through Inbox conversations..."
-                    className="w-full pl-9 pr-10 py-1.5 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] focus:bg-white focus:border-[#D92228] focus:outline-none text-xs text-[#1A1A1A] placeholder:text-[#9CA3AF] transition-all shadow-xs"
-                  />
-                  <kbd className="hidden sm:inline-block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#9CA3AF] bg-white border border-[#E5E7EB] px-1.5 py-0.5 rounded pointer-events-none">
-                    ↵
-                  </kbd>
-                </div>
-              </form>
             </div>
 
             {/* Navigation Tabs & Actions */}
