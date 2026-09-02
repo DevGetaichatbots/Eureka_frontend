@@ -18,6 +18,8 @@ import {
   Lock,
   ArrowLeft,
   X,
+  FileText,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export default function UsersPage() {
@@ -95,6 +97,71 @@ export default function UsersPage() {
     [users]
   );
 
+  const handleExportCsv = () => {
+    const headers = ['User ID', 'Email Address', 'Role', 'Status', 'Created At', 'Last Login At'];
+    const rows = filteredUsers.map((u) => [
+      u.id,
+      `"${u.email}"`,
+      u.role,
+      u.status,
+      `"${u.created_at || ''}"`,
+      `"${u.last_login_at || ''}"`,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    a.download = `eureka-jo-users-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  const handleExportXlsx = () => {
+    let xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Worksheet ss:Name="Staff Logins">
+<Table>
+<Row>
+<Cell><Data ss:Type="String">User ID</Data></Cell>
+<Cell><Data ss:Type="String">Email Address</Data></Cell>
+<Cell><Data ss:Type="String">Role</Data></Cell>
+<Cell><Data ss:Type="String">Status</Data></Cell>
+<Cell><Data ss:Type="String">Created At</Data></Cell>
+<Cell><Data ss:Type="String">Last Login At</Data></Cell>
+</Row>`;
+    filteredUsers.forEach((u) => {
+      xml += `
+<Row>
+<Cell><Data ss:Type="Number">${u.id}</Data></Cell>
+<Cell><Data ss:Type="String">${u.email}</Data></Cell>
+<Cell><Data ss:Type="String">${u.role}</Data></Cell>
+<Cell><Data ss:Type="String">${u.status}</Data></Cell>
+<Cell><Data ss:Type="String">${u.created_at || ''}</Data></Cell>
+<Cell><Data ss:Type="String">${u.last_login_at || ''}</Data></Cell>
+</Row>`;
+    });
+    xml += `\n</Table></Worksheet></Workbook>`;
+
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    a.download = `eureka-jo-users-${today}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
   // Access Guard: Viewers cannot access /users
   if (currentUser && currentUser.role !== 'admin') {
     return (
@@ -139,7 +206,7 @@ export default function UsersPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleRefresh}
             disabled={refreshing || loading}
@@ -147,6 +214,26 @@ export default function UsersPage() {
             title="Refresh Users"
           >
             <RefreshCw className={`w-4 h-4 text-[#D92228] ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+
+          {/* Export CSV Button */}
+          <button
+            onClick={handleExportCsv}
+            disabled={loading || filteredUsers.length === 0}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-[#1A1A1A] dark:text-[#F3F4F6] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-500" />
+            <span>Export CSV</span>
+          </button>
+
+          {/* Export XLSX Button */}
+          <button
+            onClick={handleExportXlsx}
+            disabled={loading || filteredUsers.length === 0}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-[#1A1A1A] dark:text-[#F3F4F6] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Export Excel (.xlsx)</span>
           </button>
 
           <button
