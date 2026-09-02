@@ -13,7 +13,6 @@ import {
   karachiDateKey,
 } from '@/lib/utils';
 import { NavRail } from '@/components/navigation/NavRail';
-import { InboxFolderSidebar } from '@/components/chat/InboxFolderSidebar';
 import { ContactDetailsDrawer } from '@/components/chat/ContactDetailsDrawer';
 import { MessageBubble } from '@/components/thread/MessageBubble';
 import { DateDivider } from '@/components/thread/DateDivider';
@@ -386,16 +385,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         onToggleCollapse={() => setCollapseNavRail(!collapseNavRail)}
       />
 
-      {/* COLUMN 2: Inbox Folder Sidebar */}
-      <InboxFolderSidebar
-        selectedFolder={selectedFolder}
-        onSelectFolder={setSelectedFolder}
-        counts={folderCounts}
-        collapsed={collapseFolderSidebar}
-        onToggleCollapse={() => setCollapseFolderSidebar(!collapseFolderSidebar)}
-      />
-
-      {/* COLUMN 3: Conversation Thread List Pane */}
+      {/* COLUMN 2: Conversation Thread List Pane */}
       <div className="w-80 sm:w-88 flex-shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full min-h-0 z-10">
         {/* Top Control / Filter Bar */}
         <div className="p-3 border-b border-[#E5E7EB] space-y-2 bg-white">
