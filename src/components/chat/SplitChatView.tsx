@@ -63,6 +63,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   // Conversations list state
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingList, setLoadingList] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed'>('open');
@@ -81,6 +82,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     messages: Message[];
   } | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [threadError, setThreadError] = useState<string | null>(null);
   const [refreshingThread, setRefreshingThread] = useState(false);
   const [messageRange, setMessageRange] = useState<'all' | '3' | '7' | '30' | 'custom'>('all');
   const [customStart, setCustomStart] = useState('');
@@ -101,11 +103,16 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       if (showLoading) setLoadingList(true);
       const res = await api.getConversations();
       setConversations(res.items);
+      setListError(null);
 
       // If no selectedId, default to the latest conversation
       setSelectedId((prev) => (prev ? prev : (res.items.length > 0 ? res.items[0].id : null)));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load conversations:', err);
+      // Only set error if we have no data yet (don't overwrite existing data on poll failures)
+      if (conversations.length === 0) {
+        setListError(err?.message || 'Failed to load conversations. Check your connection.');
+      }
     } finally {
       if (showLoading) setLoadingList(false);
     }
@@ -113,25 +120,30 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   useEffect(() => {
     loadConversations(true);
-    // Poll every 4 seconds so newly received WhatsApp messages appear live
+    // Poll every 8 seconds so newly received WhatsApp messages appear live
     const timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       loadConversations(false);
-    }, 2000);
+    }, 8000);
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch active conversation messages with 3s silent auto-polling so new messages appear live
+  // Fetch active conversation messages with 5s silent auto-polling so new messages appear live
   useEffect(() => {
     if (!selectedId) return;
 
     let isMounted = true;
+
+    // Clear stale data from previous conversation immediately
+    setActiveData(null);
+    setThreadError(null);
 
     async function fetchThread(showSpinner = false) {
       try {
         if (showSpinner) setLoadingThread(true);
         const data = await api.getConversation(selectedId!);
         if (isMounted) {
+          setThreadError(null);
           setActiveData((prev) => {
             const prevMax = prev?.messages?.length
               ? Math.max(...prev.messages.map((m) => m.id || 0))
@@ -141,6 +153,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               : 0;
             if (
               prev &&
+              prev.conversation?.id === data.conversation?.id &&
               prev.messages.length === data.messages.length &&
               prevMax === nextMax
             ) {
@@ -152,8 +165,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
             return data;
           });
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error(`Failed to load conversation #${selectedId}:`, err);
+        if (isMounted) {
+          setThreadError(err?.message || 'Failed to load conversation messages.');
+        }
       } finally {
         if (showSpinner && isMounted) setLoadingThread(false);
       }
@@ -164,7 +180,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     const timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchThread(false);
-    }, 2000);
+    }, 5000);
 
     return () => {
       isMounted = false;
@@ -310,10 +326,14 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     });
   }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder]);
 
-  // Select a conversation and update URL
+  // Select a conversation — state-driven, no URL navigation to avoid re-render conflicts
   const handleSelectConversation = (id: number) => {
+    if (id === selectedId) return; // already selected
     setSelectedId(id);
-    router.replace(`/conversations?id=${id}`, { scroll: false });
+    // Update URL without triggering navigation/re-render
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/conversations?id=${id}`);
+    }
   };
 
   return (
@@ -408,6 +428,19 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
             <div className="p-8 text-center text-[#6B7280]">
               <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#D92228] mb-2" />
               <p className="text-xs">Loading conversations...</p>
+            </div>
+          ) : listError && conversations.length === 0 ? (
+            <div className="p-8 text-center text-[#6B7280]">
+              <X className="w-8 h-8 mx-auto text-[#D92228] mb-2 opacity-60" />
+              <p className="text-xs font-semibold text-[#D92228]">Failed to load conversations</p>
+              <p className="text-[11px] text-[#6B7280] mt-1 max-w-[200px] mx-auto">{listError}</p>
+              <button
+                type="button"
+                onClick={() => loadConversations(true)}
+                className="mt-3 px-3 py-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] text-xs font-semibold hover:bg-[#F5C2C4] transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
             </div>
           ) : filteredConversations.length === 0 ? (
             <div className="p-8 text-center text-[#6B7280]">
@@ -619,6 +652,21 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 <div className="flex items-center justify-center h-full text-[#6B7280]">
                   <RefreshCw className="w-6 h-6 animate-spin text-[#D92228] mr-2" />
                   <span className="text-xs font-semibold">Loading messages...</span>
+                </div>
+              ) : threadError ? (
+                <div className="flex flex-col items-center justify-center h-full text-[#6B7280]">
+                  <X className="w-10 h-10 text-[#D92228] mb-2 opacity-60" />
+                  <p className="text-sm font-semibold text-[#D92228]">Failed to load messages</p>
+                  <p className="text-xs text-[#6B7280] mt-1 max-w-sm text-center">
+                    {threadError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRefreshThread}
+                    className="mt-3 px-4 py-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] text-xs font-semibold hover:bg-[#F5C2C4] transition-colors cursor-pointer"
+                  >
+                    Retry
+                  </button>
                 </div>
               ) : sortedMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-[#6B7280]">

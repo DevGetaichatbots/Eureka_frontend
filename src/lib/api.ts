@@ -10,8 +10,6 @@ import {
   SearchResultItem,
 } from '@/types';
 import {
-  MOCK_CONVERSATIONS,
-  MOCK_MESSAGES,
   MOCK_CONTACTS,
   MOCK_ERRORS,
   MOCK_USERS,
@@ -38,6 +36,7 @@ class ApiClient {
       },
       cache: 'no-store',
       credentials: 'include',
+      signal: AbortSignal.timeout(10000),
     });
 
     if (res.status === 401 && typeof window !== 'undefined') {
@@ -89,29 +88,11 @@ class ApiClient {
 
   // Conversations
   async getConversations(page = 1, limit = 50): Promise<PaginatedResponse<Conversation>> {
-    try {
-      return await this.fetch<PaginatedResponse<Conversation>>(`/api/conversations?page=${page}&limit=${limit}`);
-    } catch (err) {
-      console.warn('Live backend fetch failed, using fallback:', err);
-      return {
-        items: MOCK_CONVERSATIONS,
-        total: MOCK_CONVERSATIONS.length,
-        page,
-        limit,
-        total_pages: 1,
-      };
-    }
+    return await this.fetch<PaginatedResponse<Conversation>>(`/api/conversations?page=${page}&limit=${limit}`);
   }
 
   async getConversation(id: number): Promise<{ conversation: Conversation; messages: Message[] }> {
-    try {
-      return await this.fetch<{ conversation: Conversation; messages: Message[] }>(`/api/conversations/${id}`);
-    } catch (err) {
-      console.warn(`Live backend fetch for conversation #${id} failed, using fallback:`, err);
-      const conv = MOCK_CONVERSATIONS.find((c) => c.id === id) || MOCK_CONVERSATIONS[0];
-      const messages = MOCK_MESSAGES[id] || [];
-      return { conversation: conv, messages };
-    }
+    return await this.fetch<{ conversation: Conversation; messages: Message[] }>(`/api/conversations/${id}`);
   }
 
   // Search & Filter
