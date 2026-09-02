@@ -1,16 +1,20 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { Contact } from '@/types';
+import * as XLSX from 'xlsx';
+import { Contact, Message } from '@/types';
+import { api } from '@/lib/api';
 import { formatKarachiDateTime, formatPhone, isWithin24Hours } from '@/lib/utils';
 import {
   MessageSquare,
   ChevronRight,
-  ExternalLink,
   Flame,
   Clock,
   Calendar,
+  FileText,
+  FileSpreadsheet,
+  Loader2,
 } from 'lucide-react';
 
 interface LeadsTableProps {
@@ -20,6 +24,121 @@ interface LeadsTableProps {
 }
 
 export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) {
+  const [downloadingId, setDownloadingId] = useState<{ id: number; type: 'csv' | 'xlsx' } | null>(null);
+
+  const fetchLeadMessages = async (contactId: number): Promise<Message[]> => {
+    try {
+      const res = await api.getConversation(contactId);
+      return res?.messages || [];
+    } catch (err) {
+      console.error(`Failed to fetch messages for contact #${contactId}:`, err);
+      return [];
+    }
+  };
+
+  const handleDownloadSingleCsv = async (contact: Contact) => {
+    setDownloadingId({ id: contact.id, type: 'csv' });
+    try {
+      const messages = await fetchLeadMessages(contact.id);
+      const name = contact.profile_name || 'WhatsApp User';
+      const phone = formatPhone(contact.wa_id);
+
+      const csvLines: string[] = [];
+      csvLines.push('\uFEFF"--- LEAD SUMMARY ---"');
+      csvLines.push(`"Profile Name","${name.replace(/"/g, '""')}"`);
+      csvLines.push(`"WhatsApp Phone","${phone}"`);
+      csvLines.push(`"Raw WA ID","${contact.wa_id}"`);
+      csvLines.push(`"First Contact (PKT)","${formatKarachiDateTime(contact.first_seen_at)}"`);
+      csvLines.push(`"Last Activity (PKT)","${formatKarachiDateTime(contact.last_seen_at)}"`);
+      csvLines.push(`"Total Messages","${contact.message_count || messages.length}"`);
+      csvLines.push('');
+      csvLines.push('"--- MESSAGE HISTORY ---"');
+      csvLines.push('"Message ID","Direction","Date & Time (PKT)","Type","Message Body"');
+
+      messages.forEach((m) => {
+        const direction = m.direction === 'customer' ? 'Customer' : 'Eureka Jo Bot';
+        const timestamp = formatKarachiDateTime(m.sent_at || m.created_at);
+        const body = (m.body || '').replace(/"/g, '""').replace(/\n/g, ' ');
+        csvLines.push(`"${m.id}","${direction}","${timestamp}","${m.msg_type || 'text'}","${body}"`);
+      });
+
+      const blob = new Blob([csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const cleanName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `lead_${cleanName}_${contact.wa_id}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to download single lead CSV:', err);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadSingleXlsx = async (contact: Contact) => {
+    setDownloadingId({ id: contact.id, type: 'xlsx' });
+    try {
+      const messages = await fetchLeadMessages(contact.id);
+      const name = contact.profile_name || 'WhatsApp User';
+      const phone = formatPhone(contact.wa_id);
+
+      const summaryData = [
+        { Field: 'Profile Name', Value: name },
+        { Field: 'WhatsApp Phone', Value: phone },
+        { Field: 'Raw WA ID', Value: contact.wa_id },
+        { Field: 'First Contact (PKT)', Value: formatKarachiDateTime(contact.first_seen_at) },
+        { Field: 'Last Activity (PKT)', Value: formatKarachiDateTime(contact.last_seen_at) },
+        { Field: 'Total Messages', Value: contact.message_count || messages.length },
+      ];
+
+      const messagesData = messages.map((m) => ({
+        'Message ID': m.id,
+        Direction: m.direction === 'customer' ? 'Customer' : 'Eureka Jo Bot',
+        'Date & Time (PKT)': formatKarachiDateTime(m.sent_at || m.created_at),
+        Type: m.msg_type || 'text',
+        'Message Body': m.body || '',
+      }));
+
+      const workbook = XLSX.utils.book_new();
+
+      const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+      summarySheet['!cols'] = [{ wch: 22 }, { wch: 35 }];
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Lead Summary');
+
+      const messagesSheet = XLSX.utils.json_to_sheet(messagesData);
+      messagesSheet['!cols'] = [
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 25 },
+        { wch: 12 },
+        { wch: 60 },
+      ];
+      XLSX.utils.book_append_sheet(workbook, messagesSheet, 'Message History');
+
+      const buf = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const blob = new Blob([buf], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const cleanName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `lead_${cleanName}_${contact.wa_id}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to download single lead XLSX:', err);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="divide-y divide-gray-100 dark:divide-[#222e35]">
@@ -75,6 +194,8 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
             const active = isWithin24Hours(contact.last_seen_at);
             const name = contact.profile_name || 'WhatsApp User';
             const phone = formatPhone(contact.wa_id);
+            const isDownloadingCsv = downloadingId?.id === contact.id && downloadingId.type === 'csv';
+            const isDownloadingXlsx = downloadingId?.id === contact.id && downloadingId.type === 'xlsx';
 
             return (
               <tr
@@ -134,15 +255,48 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
                   </span>
                 </td>
 
-                {/* Action Link */}
+                {/* Action Column with Individual Lead Export CSV, Excel & View Chat Buttons */}
                 <td className="py-4 px-4 sm:px-6 text-right">
-                  <Link
-                    href={`/conversations/${contact.id}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-[#1A1A1A] hover:bg-[#D92228] hover:text-white hover:border-[#D92228] transition-all shadow-xs cursor-pointer"
-                  >
-                    <span>View Chat</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+                  <div className="flex items-center justify-end gap-1.5">
+                    {/* Individual CSV Export */}
+                    <button
+                      onClick={() => handleDownloadSingleCsv(contact)}
+                      disabled={downloadingId?.id === contact.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                      title={`Download CSV for ${name}`}
+                    >
+                      {isDownloadingCsv ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                      ) : (
+                        <FileText className="w-3.5 h-3.5 text-blue-500" />
+                      )}
+                      <span>CSV</span>
+                    </button>
+
+                    {/* Individual Excel (.xlsx) Export */}
+                    <button
+                      onClick={() => handleDownloadSingleXlsx(contact)}
+                      disabled={downloadingId?.id === contact.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                      title={`Download Excel (.xlsx) for ${name}`}
+                    >
+                      {isDownloadingXlsx ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                      ) : (
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      )}
+                      <span>XLSX</span>
+                    </button>
+
+                    {/* View Chat Link */}
+                    <Link
+                      href={`/conversations/${contact.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-[#1A1A1A] hover:bg-[#D92228] hover:text-white hover:border-[#D92228] transition-all shadow-xs cursor-pointer"
+                    >
+                      <span>View Chat</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </td>
               </tr>
             );
