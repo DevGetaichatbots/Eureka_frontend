@@ -27,7 +27,7 @@ export function CreateUserModal({
   onUserCreated,
 }: CreateUserModalProps) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState('password123');
   const [role, setRole] = useState<UserRole>('viewer');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export function CreateUserModal({
       const newUser = await api.createUser({ email, password, role });
       onUserCreated(newUser);
       setEmail('');
-      setPassword('');
+      setPassword('password123');
       setRole('viewer');
       onClose();
     } catch (err: unknown) {

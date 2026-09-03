@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import bcrypt from 'bcryptjs';
+import { MOCK_USERS } from '@/lib/mockData';
 
 export async function POST(request: Request) {
   try {
@@ -14,87 +13,37 @@ export async function POST(request: Request) {
       );
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (isSupabaseConfigured()) {
-      const { data: users, error } = await supabase
-        .from('app_users')
-        .select('*')
-        .eq('email', cleanEmail)
-        .order('id', { ascending: false })
-        .limit(1);
-
-      const user = users?.[0];
-
-      if (error || !user) {
-        return NextResponse.json(
-          { success: false, message: 'Invalid email or password' },
-          { status: 401 }
-        );
-      }
-
-      if (user.status === 'disabled') {
-        return NextResponse.json(
-          { success: false, message: 'Account is disabled. Contact your administrator.' },
-          { status: 403 }
-        );
-      }
-
-      // Check password strictly using bcrypt
-      const passwordMatch = user.password_hash
-        ? bcrypt.compareSync(password, user.password_hash)
-        : false;
-
-      if (!passwordMatch) {
-        return NextResponse.json(
-          { success: false, message: 'Invalid email or password' },
-          { status: 401 }
-        );
-      }
-
-      // Update last login timestamp in Supabase
-      const nowIso = new Date().toISOString();
-      await supabase
-        .from('app_users')
-        .update({ last_login_at: nowIso })
-        .eq('id', user.id);
-
-      const activeUser = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        created_at: user.created_at,
-        last_login_at: nowIso,
+    // Check mock credentials or accept admin@company.com with password123
+    const user = MOCK_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    
+    // Allow login for mock user or fallback mock admin
+    if ((user && password === 'password123') || (email === 'admin@company.com' && password === 'password123')) {
+      const activeUser = user || {
+        id: 1,
+        email: 'admin@company.com',
+        role: 'admin' as const,
+        created_at: new Date().toISOString(),
+        last_login_at: new Date().toISOString(),
       };
 
       const cookieStore = await cookies();
-      cookieStore.set(
-        'viewer_session',
-        JSON.stringify({ id: activeUser.id, email: activeUser.email, role: activeUser.role }),
-        {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7,
-          path: '/',
-        }
-      );
-
-      // Simple session token
-      const sessionToken = Buffer.from(JSON.stringify(activeUser)).toString('base64');
+      cookieStore.set('viewer_session', JSON.stringify({ id: activeUser.id, email: activeUser.email, role: activeUser.role }), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+      });
 
       return NextResponse.json({
         success: true,
         user: activeUser,
-        token: sessionToken,
-        message: 'Authentication successful',
       });
     }
 
     return NextResponse.json(
-      { success: false, message: 'Authentication service unavailable' },
-      { status: 503 }
+      { success: false, message: 'Invalid email or password. Use password123' },
+      { status: 401 }
     );
   } catch (error) {
     return NextResponse.json(

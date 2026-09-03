@@ -30,6 +30,7 @@ import {
   ArrowLeft,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Info,
   ExternalLink,
   ShieldCheck,
@@ -44,10 +45,6 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Filter,
-  Loader2,
-  Archive,
-  ArchiveRestore,
-  Trash2,
 } from 'lucide-react';
 
 interface SplitChatViewProps {
@@ -58,9 +55,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Selected conversation ID or contact ID from URL or initialId
+  // Selected conversation ID from URL or initialId
   const parsedId = Number(searchParams.get('id'));
-  const parsedContactId = Number(searchParams.get('contact_id'));
   const urlId =
     Number.isFinite(parsedId) && parsedId > 0 ? parsedId : initialId;
 
@@ -70,58 +66,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
-  const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed' | 'archived'>('open');
+  const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed'>('open');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedId, setSelectedId] = useState<number | null>(urlId || null);
-  const [mobileView, setMobileView] = useState<'list' | 'chat'>(
-    urlId || parsedContactId ? 'chat' : 'list'
-  );
-
-  // Archived & Deleted conversation IDs (persisted in localStorage)
-  const [archivedIds, setArchivedIds] = useState<number[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      return JSON.parse(localStorage.getItem('eureka_archived_conversations') || '[]');
-    } catch {
-      return [];
-    }
-  });
-
-  const [deletedIds, setDeletedIds] = useState<number[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      return JSON.parse(localStorage.getItem('eureka_deleted_conversations') || '[]');
-    } catch {
-      return [];
-    }
-  });
-
-  const handleToggleArchive = (convId: number) => {
-    setArchivedIds((prev) => {
-      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('eureka_archived_conversations', JSON.stringify(next));
-      }
-      return next;
-    });
-  };
-
-  const handleDeleteConversation = (convId: number) => {
-    if (!confirm('Are you sure you want to delete/hide this conversation from your inbox?')) return;
-    setDeletedIds((prev) => {
-      const next = [...prev, convId];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('eureka_deleted_conversations', JSON.stringify(next));
-      }
-      return next;
-    });
-    if (selectedId === convId) {
-      setSelectedId(null);
-      setActiveData(null);
-      setMobileView('list');
-    }
-  };
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>(urlId ? 'chat' : 'list');
 
   // Layout drawer toggles
   const [collapseNavRail, setCollapseNavRail] = useState(false);
@@ -140,6 +89,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
 
+  // In-conversation message search state
+  const [inChatSearch, setInChatSearch] = useState('');
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Lightbox
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -154,28 +108,10 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     try {
       if (showLoading) setLoadingList(true);
       const res = await api.getConversations();
-      const items = res.items || [];
-      setConversations(items);
+      setConversations(res.items || []);
       setListError(null);
 
-      // Check if URL specified a contact_id or id
-      const cId = Number(searchParams.get('contact_id'));
-      const iId = Number(searchParams.get('id')) || initialId;
-
-      let match: Conversation | undefined;
-      if (cId) {
-        match = items.find((c) => c.contact_id === cId || c.contact?.id === cId);
-      }
-      if (!match && iId) {
-        match = items.find((c) => c.id === iId || c.contact_id === iId || c.contact?.id === iId);
-      }
-
-      if (match) {
-        setSelectedId(match.id);
-        if (showLoading) setMobileView('chat');
-      } else {
-        setSelectedId((prev) => (prev ? prev : (items.length > 0 ? items[0].id : null)));
-      }
+      setSelectedId((prev) => (prev ? prev : (res.items.length > 0 ? res.items[0].id : null)));
     } catch (err: any) {
       console.error('Failed to load conversations:', err);
       if (showLoading) {
@@ -208,6 +144,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     setMessageRange('all');
     setCustomStart('');
     setCustomEnd('');
+    setInChatSearch('');
+    setActiveMatchIndex(0);
 
     async function fetchThread(showSpinner = false) {
       try {
@@ -338,6 +276,60 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     });
   }, [activeData?.messages, messageRange, customStart, customEnd]);
 
+  // In-conversation message search matching & navigation
+  const matchingMessageIds = useMemo(() => {
+    if (!inChatSearch.trim() || !sortedMessages.length) return [];
+    const q = inChatSearch.toLowerCase().trim();
+    return sortedMessages
+      .filter((m) => (m.body || '').toLowerCase().includes(q))
+      .map((m) => m.id);
+  }, [sortedMessages, inChatSearch]);
+
+  const scrollToMatchedMessage = (targetId: number) => {
+    if (!targetId) return;
+    const el = document.getElementById(`msg-${targetId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const handleNextMatch = () => {
+    if (!matchingMessageIds.length) return;
+    const nextIdx = (activeMatchIndex + 1) % matchingMessageIds.length;
+    setActiveMatchIndex(nextIdx);
+    scrollToMatchedMessage(matchingMessageIds[nextIdx]);
+  };
+
+  const handlePrevMatch = () => {
+    if (!matchingMessageIds.length) return;
+    const prevIdx =
+      (activeMatchIndex - 1 + matchingMessageIds.length) % matchingMessageIds.length;
+    setActiveMatchIndex(prevIdx);
+    scrollToMatchedMessage(matchingMessageIds[prevIdx]);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        handlePrevMatch();
+      } else {
+        handleNextMatch();
+      }
+    } else if (e.key === 'Escape') {
+      setInChatSearch('');
+      setActiveMatchIndex(0);
+    }
+  };
+
+  // When search query is entered and matches change, auto-jump to the first match
+  useEffect(() => {
+    if (matchingMessageIds.length > 0) {
+      setActiveMatchIndex(0);
+      scrollToMatchedMessage(matchingMessageIds[0]);
+    }
+  }, [inChatSearch]);
+
   const isNearBottom = (el: HTMLDivElement) =>
     el.scrollHeight - el.scrollTop - el.clientHeight < 96;
 
@@ -377,38 +369,25 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   // Counts for folders
   const folderCounts = useMemo(() => {
-    const valid = conversations.filter((c) => !deletedIds.includes(c.id));
-    const total = valid.filter((c) => !archivedIds.includes(c.id)).length;
-    const active = valid.filter((c) => !archivedIds.includes(c.id) && isWithin24Hours(c.last_message_at)).length;
+    const total = conversations.length;
+    const active = conversations.filter((c) => isWithin24Hours(c.last_message_at)).length;
     return {
       all: total,
       active,
       bot: total,
       unassigned: 0,
       reminders: 1,
-      archived: valid.filter((c) => archivedIds.includes(c.id)).length,
     };
-  }, [conversations, archivedIds, deletedIds]);
+  }, [conversations]);
 
   // Filtered & Sorted conversations list
   const filteredConversations = useMemo(() => {
     const rows = conversations
       .filter((conv) => {
-        // Exclude permanently deleted/hidden conversations
-        if (deletedIds.includes(conv.id)) return false;
-
-        // Check Archive status
-        const isArchived = archivedIds.includes(conv.id);
-        if (chatFilter === 'archived') {
-          if (!isArchived) return false;
-        } else {
-          if (isArchived) return false;
-        }
-
         if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
+          const q = searchQuery.toLowerCase();
           const name = (conv.contact?.profile_name || '').toLowerCase();
-          const phone = String(conv.contact?.wa_id || '').toLowerCase();
+          const phone = (conv.contact?.wa_id || '').toLowerCase();
           const lastMsg = (conv.last_message?.body || '').toLowerCase();
           if (!name.includes(q) && !phone.includes(q) && !lastMsg.includes(q)) {
             return false;
@@ -449,7 +428,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       seen.add(key);
       return true;
     });
-  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder, archivedIds, deletedIds]);
+  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder]);
 
   // Select a conversation — state-driven, no URL navigation to avoid re-render conflicts
   const handleSelectConversation = (id: number) => {
@@ -480,7 +459,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         {/* Top Control / Filter Bar */}
         <div className="p-3 border-b border-[#E5E7EB] space-y-2 bg-white">
           {/* Quick Filter Controls matching reference screenshot */}
-          <div className="flex items-center justify-between gap-1.5 text-xs overflow-x-auto">
+          <div className="flex items-center justify-between gap-1.5 text-xs">
             {/* Open Chats Dropdown */}
             <div className="relative inline-block">
               <select
@@ -491,7 +470,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 <option value="open">💬 Open Chats</option>
                 <option value="active24h">🔥 Active 24h</option>
                 <option value="closed">⏱ Closed</option>
-                <option value="archived">📦 Archived ({archivedIds.length})</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -530,7 +508,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search chats by name, phone, or message..."
+              placeholder="Filter by contact name or message..."
               className="w-full pl-8 pr-7 py-1.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#1A1A1A] placeholder-[#9CA3AF] focus:outline-none focus:ring-1 focus:ring-[#D92228] transition-all"
             />
             {searchQuery && (
@@ -662,42 +640,12 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="text-xs text-[#6B7280] truncate leading-relaxed flex-1">
-                            {isBotMsg ? (
-                              <span className="text-[#D92228] font-medium mr-1">You:</span>
-                            ) : null}
-                            {lastMsg?.body || 'Attachment'}
-                          </p>
-                          <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleArchive(conv.id);
-                              }}
-                              className="p-1 rounded text-[#9CA3AF] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
-                              title={archivedIds.includes(conv.id) ? 'Unarchive' : 'Archive'}
-                            >
-                              {archivedIds.includes(conv.id) ? (
-                                <ArchiveRestore className="w-3 h-3" />
-                              ) : (
-                                <Archive className="w-3 h-3" />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteConversation(conv.id);
-                              }}
-                              className="p-1 rounded text-[#9CA3AF] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
+                        <p className="text-xs text-[#6B7280] truncate leading-relaxed">
+                          {isBotMsg ? (
+                            <span className="text-[#D92228] font-medium mr-1">You:</span>
+                          ) : null}
+                          {lastMsg?.body || 'Attachment'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -719,30 +667,108 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         {activeData ? (
           <>
             {/* Top Contact Header Bar matching reference screenshot */}
-            <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#E5E7EB] bg-white shadow-xs z-10 flex-shrink-0 space-y-2 overflow-x-auto">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                {/* Mobile Back Button */}
-                <button
-                  type="button"
-                  onClick={() => setMobileView('list')}
-                  className="p-1.5 -ml-1 rounded-xl text-[#1A1A1A] hover:bg-[#FDEBEC] hover:text-[#D92228] transition-colors md:hidden cursor-pointer flex-shrink-0"
-                  title="Back to conversations list"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
+            <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#E5E7EB] bg-white shadow-xs z-10 flex-shrink-0 space-y-2">
+              <div className="flex items-center justify-between gap-2 sm:gap-4 min-w-0">
+                {/* Left: Avatar & Contact Info */}
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink-0">
+                  {/* Mobile Back Button */}
+                  <button
+                    type="button"
+                    onClick={() => setMobileView('list')}
+                    className="p-1.5 -ml-1 rounded-xl text-[#1A1A1A] hover:bg-[#FDEBEC] hover:text-[#D92228] transition-colors md:hidden cursor-pointer flex-shrink-0"
+                    title="Back to conversations list"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
 
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-xs sm:text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
-                  {activeData.conversation.contact?.profile_name?.[0]?.toUpperCase() || 'W'}
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-xs sm:text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
+                    {activeData.conversation.contact?.profile_name?.[0]?.toUpperCase() || 'W'}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-xs sm:text-sm font-bold text-[#1A1A1A] truncate">
+                      {activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}
+                    </h2>
+                    <p className="text-[10px] text-[#6B7280] font-mono sm:hidden truncate">
+                      +{activeData.conversation.contact?.wa_id}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xs sm:text-sm font-bold text-[#1A1A1A] truncate">
-                    {activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}
-                  </h2>
-                  <p className="text-[10px] text-[#6B7280] font-mono sm:hidden truncate">
-                    +{activeData.conversation.contact?.wa_id}
-                  </p>
+
+                {/* Center: In-Conversation Search Bar (Directly where user circled in red) */}
+                <div className="flex-1 max-w-sm lg:max-w-md mx-1 sm:mx-2 min-w-0">
+                  <div className="relative flex items-center">
+                    <Search className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={inChatSearch}
+                      onChange={(e) => setInChatSearch(e.target.value)}
+                      onKeyDown={handleSearchKeyDown}
+                      placeholder="Search messages in this chat..."
+                      className={`w-full pl-8 pr-24 py-1.5 rounded-xl border text-xs text-[#1A1A1A] placeholder-[#9CA3AF] focus:outline-none transition-all ${
+                        inChatSearch.trim()
+                          ? 'border-[#D92228] bg-white ring-1 ring-[#D92228]/20 shadow-xs'
+                          : 'border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white focus:bg-white focus:border-[#D92228]'
+                      }`}
+                    />
+
+                    {/* Controls inside the search input */}
+                    {inChatSearch.trim() && (
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 sm:gap-1">
+                        {/* Match counter badge */}
+                        <span
+                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
+                            matchingMessageIds.length > 0
+                              ? 'bg-[#FDEBEC] text-[#D92228]'
+                              : 'bg-gray-100 text-[#6B7280]'
+                          }`}
+                        >
+                          {matchingMessageIds.length > 0
+                            ? `${activeMatchIndex + 1}/${matchingMessageIds.length}`
+                            : '0'}
+                        </span>
+
+                        {/* Prev match button */}
+                        <button
+                          type="button"
+                          onClick={handlePrevMatch}
+                          disabled={matchingMessageIds.length <= 1}
+                          className="p-1 rounded text-[#6B7280] hover:text-[#1A1A1A] hover:bg-gray-100 disabled:opacity-30 cursor-pointer"
+                          title="Previous match (Shift+Enter)"
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+
+                        {/* Next match button */}
+                        <button
+                          type="button"
+                          onClick={handleNextMatch}
+                          disabled={matchingMessageIds.length <= 1}
+                          className="p-1 rounded text-[#6B7280] hover:text-[#1A1A1A] hover:bg-gray-100 disabled:opacity-30 cursor-pointer"
+                          title="Next match (Enter)"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+
+                        {/* Clear search */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInChatSearch('');
+                            setActiveMatchIndex(0);
+                          }}
+                          className="p-1 rounded text-[#9CA3AF] hover:text-[#D92228] hover:bg-[#FDEBEC] cursor-pointer"
+                          title="Clear search (Esc)"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 overflow-x-auto max-w-[62%] sm:max-w-none">
+
+                {/* Right: Actions (Reload, Message Range, CRM Drawer) */}
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
                   <button
                     type="button"
                     onClick={handleRefreshThread}
@@ -756,45 +782,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                       }`}
                     />
                     <span className="hidden sm:inline">{refreshingThread ? 'Reloading' : 'Reload'}</span>
-                  </button>
-
-                  {/* Archive / Unarchive Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleArchive(activeData.conversation.id)}
-                    className={`inline-flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-                      archivedIds.includes(activeData.conversation.id)
-                        ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
-                        : 'border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC]'
-                    }`}
-                    title={
-                      archivedIds.includes(activeData.conversation.id)
-                        ? 'Restore conversation from archive'
-                        : 'Move conversation to archive'
-                    }
-                  >
-                    {archivedIds.includes(activeData.conversation.id) ? (
-                      <>
-                        <ArchiveRestore className="w-3.5 h-3.5 text-[#D92228]" />
-                        <span className="hidden sm:inline">Unarchive</span>
-                      </>
-                    ) : (
-                      <>
-                        <Archive className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Archive</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Delete / Hide Chat Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteConversation(activeData.conversation.id)}
-                    className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
-                    title="Delete conversation from inbox"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Delete</span>
                   </button>
                   <select
                     value={messageRange}
@@ -949,6 +936,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                         contactName={
                           activeData.conversation.contact?.profile_name || 'Customer'
                         }
+                        searchQuery={inChatSearch}
+                        isFocusedResult={
+                          matchingMessageIds.length > 0 &&
+                          matchingMessageIds[activeMatchIndex] === msg.id
+                        }
                         onImageClick={(url) => setSelectedImage(url)}
                       />
                     </React.Fragment>
@@ -972,16 +964,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               </button>
             </div>
           </>
-        ) : loadingThread || selectedId ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#F9FAFB]/60">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center border border-[#F5C2C4] shadow-xs">
-                <Loader2 className="w-6 h-6 animate-spin text-[#D92228]" />
-              </div>
-              <p className="text-xs font-semibold text-[#1A1A1A]">Loading conversation thread...</p>
-              <p className="text-[11px] text-[#6B7280]">Fetching customer message history</p>
-            </div>
-          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-[#6B7280] p-6 text-center">
             {mobileView === 'chat' && (

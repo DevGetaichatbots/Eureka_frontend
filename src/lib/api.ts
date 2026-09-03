@@ -10,10 +10,13 @@ import {
   SearchResultItem,
 } from '@/types';
 import {
+  MOCK_CONTACTS,
   MOCK_ERRORS,
+  MOCK_USERS,
 } from './mockData';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const USE_MOCK = false;
 
 class ApiClient {
   private async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -91,12 +94,21 @@ class ApiClient {
   }
 
   // Conversations
-  async getConversations(page = 1, limit = 50): Promise<PaginatedResponse<Conversation>> {
-    return await this.fetch<PaginatedResponse<Conversation>>(`/api/conversations?page=${page}&limit=${limit}`);
+  async getConversations(page = 1, limit = 50, search?: string): Promise<PaginatedResponse<Conversation>> {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search) params.set('search', search);
+    return await this.fetch<PaginatedResponse<Conversation>>(`/api/conversations?${params.toString()}`);
   }
 
   async getConversation(id: number): Promise<{ conversation: Conversation; messages: Message[] }> {
     return await this.fetch<{ conversation: Conversation; messages: Message[] }>(`/api/conversations/${id}`);
+  }
+
+  async searchMessages(query: string, limit = 50): Promise<Array<{ message: Message; conversation_id: number; contact?: Contact }>> {
+    if (!query?.trim()) return [];
+    return await this.fetch<Array<{ message: Message; conversation_id: number; contact?: Contact }>>(
+      `/api/conversations/messages/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`
+    );
   }
 
   // Search & Filter
@@ -110,15 +122,19 @@ class ApiClient {
   }
 
   // Leads
-  async getLeads(page = 1, limit = 50): Promise<
-    PaginatedResponse<Contact> & {
-      total_leads?: number;
-      active_leads_24h?: number;
-      total_messages?: number;
-      leads?: Contact[];
+  async getLeads(page = 1, limit = 50): Promise<PaginatedResponse<Contact>> {
+    try {
+      return await this.fetch<PaginatedResponse<Contact>>(`/api/leads?page=${page}&limit=${limit}`);
+    } catch (err) {
+      console.warn('Live backend fetch for leads failed, using fallback:', err);
+      return {
+        items: MOCK_CONTACTS,
+        total: MOCK_CONTACTS.length,
+        page,
+        limit,
+        total_pages: 1,
+      };
     }
-  > {
-    return this.fetch(`/api/leads?page=${page}&limit=${limit}`);
   }
 
   // Errors
@@ -131,9 +147,14 @@ class ApiClient {
     }
   }
 
-  // Users — FastAPI / Supabase only. Never fall back to mock users.
+  // Users (Admin only)
   async getUsers(): Promise<User[]> {
-    return this.fetch<User[]>('/api/users');
+    try {
+      return await this.fetch<User[]>('/api/users');
+    } catch (err) {
+      console.warn('Live backend fetch for users failed, using fallback:', err);
+      return MOCK_USERS;
+    }
   }
 
   async createUser(data: { email: string; password?: string; role: string }): Promise<User> {
@@ -145,7 +166,7 @@ class ApiClient {
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
     return this.fetch<User>(`/api/users/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }

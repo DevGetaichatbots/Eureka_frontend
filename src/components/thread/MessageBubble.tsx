@@ -23,12 +23,38 @@ interface MessageBubbleProps {
   message: Message;
   contactName: string;
   onImageClick?: (url: string) => void;
+  searchQuery?: string;
+  isFocusedResult?: boolean;
+}
+
+function renderHighlightedText(text: string, query?: string, isBot = false) {
+  if (!query || !query.trim()) return text;
+  const q = query.trim();
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <mark
+        key={i}
+        className={`px-0.5 rounded font-semibold ${
+          isBot ? 'bg-amber-300 text-black shadow-xs' : 'bg-yellow-200 text-yellow-950 shadow-xs'
+        }`}
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
 }
 
 export function MessageBubble({
   message,
   contactName,
   onImageClick,
+  searchQuery,
+  isFocusedResult = false,
 }: MessageBubbleProps) {
   const isBot = message.direction === 'bot';
   const [isPlaying, setIsPlaying] = useState(false);
@@ -57,9 +83,10 @@ export function MessageBubble({
 
   return (
     <div
-      className={`flex items-end gap-2.5 my-2.5 ${
+      id={`msg-${message.id}`}
+      className={`flex items-end gap-2.5 my-2.5 transition-all duration-300 ${
         isBot ? 'justify-end' : 'justify-start'
-      } group`}
+      } group ${isFocusedResult ? 'scale-[1.01]' : ''}`}
     >
       {/* Left Avatar for Customer */}
       {!isBot && (
@@ -77,6 +104,12 @@ export function MessageBubble({
           isBot
             ? 'bg-[#D92228] text-white rounded-br-xs shadow-md shadow-[#D92228]/10'
             : 'bg-[#F9FAFB] text-[#1A1A1A] rounded-bl-xs border border-[#E5E7EB]'
+        } ${
+          isFocusedResult
+            ? isBot
+              ? 'ring-3 ring-amber-300 ring-offset-2 ring-offset-white'
+              : 'ring-3 ring-[#D92228] ring-offset-2 ring-offset-white'
+            : ''
         }`}
       >
         {/* Quoted Message Card (if message replies to another) */}
@@ -242,7 +275,7 @@ export function MessageBubble({
         {/* Message Text Body */}
         {normalText && message.msg_type !== 'audio' && (
           <p className="whitespace-pre-wrap leading-relaxed break-words text-[13.5px]">
-            {normalText}
+            {renderHighlightedText(normalText, searchQuery, isBot)}
           </p>
         )}
 

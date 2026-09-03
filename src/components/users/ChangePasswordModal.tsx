@@ -63,7 +63,7 @@ export function ChangePasswordModal({
       });
 
       if (res.success) {
-        onSuccess(res.message || 'Password updated. The previous password will no longer work.');
+        onSuccess(res.message || 'Password updated successfully!');
         handleClose();
       } else {
         setError(res.message || 'Failed to update password.');

@@ -29,7 +29,6 @@ export default function LeadsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [totalMessagesFromApi, setTotalMessagesFromApi] = useState(0);
 
   const loadLeads = async (pageNum = 1) => {
     setLoading(true);
@@ -41,7 +40,6 @@ export default function LeadsPage() {
       setPage(res.page || 1);
       setTotalPages(res.total_pages || 1);
       setTotalItems((res as any)?.total || (res as any)?.total_leads || safeList.length);
-      setTotalMessagesFromApi(Number((res as any)?.total_messages) || 0);
     } catch (err) {
       console.error('Failed to load leads:', err);
       setContacts([]);
@@ -80,7 +78,10 @@ export default function LeadsPage() {
     return safeList.filter((c) => isWithin24Hours(c.last_seen_at)).length;
   }, [contacts]);
 
-  const totalMessagesCount = totalMessagesFromApi;
+  const totalMessagesCount = useMemo(() => {
+    const safeList = contacts || [];
+    return safeList.reduce((sum, c) => sum + (c.message_count || 0), 0);
+  }, [contacts]);
 
   // Download handlers
   const handleExportCsv = async () => {
@@ -152,11 +153,11 @@ export default function LeadsPage() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleRefresh}
             disabled={refreshing || loading}
-            className="p-2.5 rounded-xl text-[#6B7280] hover:text-[#D92228] dark:hover:text-white bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] transition-colors disabled:opacity-50 cursor-pointer flex-shrink-0"
+            className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] dark:hover:text-white bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] transition-colors disabled:opacity-50 cursor-pointer"
             title="Refresh Leads"
           >
             <RefreshCw className={`w-4 h-4 text-[#D92228] ${refreshing ? 'animate-spin' : ''}`} />
@@ -166,7 +167,7 @@ export default function LeadsPage() {
           <button
             onClick={handleExportCsv}
             disabled={exportingCsv || loading}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-[#1A1A1A] dark:text-[#F3F4F6] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-[#1A1A1A] dark:text-[#F3F4F6] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
           >
             {exportingCsv ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D92228]" />
@@ -180,14 +181,14 @@ export default function LeadsPage() {
           <button
             onClick={handleExportXlsx}
             disabled={exportingXlsx || loading}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
           >
             {exportingXlsx ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <FileSpreadsheet className="w-3.5 h-3.5" />
             )}
-            <span>Export Excel</span>
+            <span>Export Excel (.xlsx)</span>
           </button>
         </div>
       </div>

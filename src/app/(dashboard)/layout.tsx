@@ -70,7 +70,7 @@ export default function DashboardLayout({
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-white text-[#1A1A1A] border-b border-[#E5E7EB] shadow-xs flex-shrink-0">
         <div className="w-full px-3 sm:px-6">
-          <div className="flex items-center justify-between h-13 sm:h-14 gap-2 overflow-x-auto">
+          <div className="flex items-center justify-between h-13 sm:h-14">
             {/* Brand */}
             <div className="flex items-center gap-2.5 sm:gap-3">
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#D92228] flex items-center justify-center text-white shadow-md shadow-[#D92228]/25 flex-shrink-0">
