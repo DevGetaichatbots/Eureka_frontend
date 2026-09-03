@@ -45,6 +45,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Filter,
+  Archive,
+  Trash2,
 } from 'lucide-react';
 
 interface SplitChatViewProps {
@@ -93,6 +95,32 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [inChatSearch, setInChatSearch] = useState('');
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Archive & Delete states
+  const [archivedIds, setArchivedIds] = useState<Set<number>>(new Set());
+  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
+
+  const handleToggleArchive = () => {
+    if (!selectedId) return;
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(selectedId)) {
+        next.delete(selectedId);
+      } else {
+        next.add(selectedId);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteConversation = () => {
+    if (!selectedId) return;
+    if (window.confirm('Are you sure you want to delete this conversation from your inbox view?')) {
+      setDeletedIds((prev) => new Set(prev).add(selectedId));
+      setActiveData(null);
+      setSelectedId(null);
+    }
+  };
 
   // Lightbox
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -384,6 +412,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const filteredConversations = useMemo(() => {
     const rows = conversations
       .filter((conv) => {
+        if (deletedIds.has(conv.id)) return false;
+
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const name = (conv.contact?.profile_name || '').toLowerCase();
@@ -767,7 +797,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                   </div>
                 </div>
 
-                {/* Right: Actions (Reload, Message Range, CRM Drawer) */}
+                {/* Right: Actions (Reload, Archive, Delete, Message Range, CRM Drawer) */}
                 <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
                   <button
                     type="button"
@@ -783,6 +813,35 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                     />
                     <span className="hidden sm:inline">{refreshingThread ? 'Reloading' : 'Reload'}</span>
                   </button>
+
+                  {/* Archive Button */}
+                  <button
+                    type="button"
+                    onClick={handleToggleArchive}
+                    className={`inline-flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                      activeData && archivedIds.has(activeData.conversation.id)
+                        ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                        : 'border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4]'
+                    }`}
+                    title={activeData && archivedIds.has(activeData.conversation.id) ? 'Unarchive conversation' : 'Archive conversation'}
+                  >
+                    <Archive className="w-3.5 h-3.5 text-[#D92228]" />
+                    <span className="hidden sm:inline">
+                      {activeData && archivedIds.has(activeData.conversation.id) ? 'Archived' : 'Archive'}
+                    </span>
+                  </button>
+
+                  {/* Delete Button */}
+                  <button
+                    type="button"
+                    onClick={handleDeleteConversation}
+                    className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
+                    title="Delete conversation from inbox"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-[#D92228]" />
+                    <span className="hidden sm:inline">Delete</span>
+                  </button>
+
                   <select
                     value={messageRange}
                     onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
