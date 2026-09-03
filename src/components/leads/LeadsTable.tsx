@@ -28,7 +28,12 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
 
   const fetchLeadMessages = async (contactId: number): Promise<Message[]> => {
     try {
-      const res = await api.getConversation(contactId);
+      const convs = await api.getConversations();
+      const matched = (convs.items || []).find(
+        (c) => c.contact_id === contactId || c.contact?.id === contactId || c.id === contactId
+      );
+      const targetId = matched ? matched.id : contactId;
+      const res = await api.getConversation(targetId);
       return res?.messages || [];
     } catch (err) {
       console.error(`Failed to fetch messages for contact #${contactId}:`, err);

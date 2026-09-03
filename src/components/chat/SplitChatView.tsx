@@ -45,6 +45,9 @@ import {
   PanelRightOpen,
   Filter,
   Loader2,
+  Archive,
+  ArchiveRestore,
+  Trash2,
 } from 'lucide-react';
 
 interface SplitChatViewProps {
@@ -67,13 +70,58 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
-  const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed'>('open');
+  const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed' | 'archived'>('open');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedId, setSelectedId] = useState<number | null>(urlId || null);
   const [mobileView, setMobileView] = useState<'list' | 'chat'>(
     urlId || parsedContactId ? 'chat' : 'list'
   );
+
+  // Archived & Deleted conversation IDs (persisted in localStorage)
+  const [archivedIds, setArchivedIds] = useState<number[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('eureka_archived_conversations') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const [deletedIds, setDeletedIds] = useState<number[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('eureka_deleted_conversations') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const handleToggleArchive = (convId: number) => {
+    setArchivedIds((prev) => {
+      const next = prev.includes(convId) ? prev.filter((id) => id !== convId) : [...prev, convId];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('eureka_archived_conversations', JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteConversation = (convId: number) => {
+    if (!confirm('Are you sure you want to delete/hide this conversation from your inbox?')) return;
+    setDeletedIds((prev) => {
+      const next = [...prev, convId];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('eureka_deleted_conversations', JSON.stringify(next));
+      }
+      return next;
+    });
+    if (selectedId === convId) {
+      setSelectedId(null);
+      setActiveData(null);
+      setMobileView('list');
+    }
+  };
 
   // Layout drawer toggles
   const [collapseNavRail, setCollapseNavRail] = useState(false);
@@ -329,25 +377,38 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   // Counts for folders
   const folderCounts = useMemo(() => {
-    const total = conversations.length;
-    const active = conversations.filter((c) => isWithin24Hours(c.last_message_at)).length;
+    const valid = conversations.filter((c) => !deletedIds.includes(c.id));
+    const total = valid.filter((c) => !archivedIds.includes(c.id)).length;
+    const active = valid.filter((c) => !archivedIds.includes(c.id) && isWithin24Hours(c.last_message_at)).length;
     return {
       all: total,
       active,
       bot: total,
       unassigned: 0,
       reminders: 1,
+      archived: valid.filter((c) => archivedIds.includes(c.id)).length,
     };
-  }, [conversations]);
+  }, [conversations, archivedIds, deletedIds]);
 
   // Filtered & Sorted conversations list
   const filteredConversations = useMemo(() => {
     const rows = conversations
       .filter((conv) => {
+        // Exclude permanently deleted/hidden conversations
+        if (deletedIds.includes(conv.id)) return false;
+
+        // Check Archive status
+        const isArchived = archivedIds.includes(conv.id);
+        if (chatFilter === 'archived') {
+          if (!isArchived) return false;
+        } else {
+          if (isArchived) return false;
+        }
+
         if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
+          const q = searchQuery.toLowerCase().trim();
           const name = (conv.contact?.profile_name || '').toLowerCase();
-          const phone = (conv.contact?.wa_id || '').toLowerCase();
+          const phone = String(conv.contact?.wa_id || '').toLowerCase();
           const lastMsg = (conv.last_message?.body || '').toLowerCase();
           if (!name.includes(q) && !phone.includes(q) && !lastMsg.includes(q)) {
             return false;
@@ -388,7 +449,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       seen.add(key);
       return true;
     });
-  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder]);
+  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder, archivedIds, deletedIds]);
 
   // Select a conversation — state-driven, no URL navigation to avoid re-render conflicts
   const handleSelectConversation = (id: number) => {
@@ -430,6 +491,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 <option value="open">💬 Open Chats</option>
                 <option value="active24h">🔥 Active 24h</option>
                 <option value="closed">⏱ Closed</option>
+                <option value="archived">📦 Archived ({archivedIds.length})</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -600,12 +662,42 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                           </span>
                         </div>
 
-                        <p className="text-xs text-[#6B7280] truncate leading-relaxed">
-                          {isBotMsg ? (
-                            <span className="text-[#D92228] font-medium mr-1">You:</span>
-                          ) : null}
-                          {lastMsg?.body || 'Attachment'}
-                        </p>
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-xs text-[#6B7280] truncate leading-relaxed flex-1">
+                            {isBotMsg ? (
+                              <span className="text-[#D92228] font-medium mr-1">You:</span>
+                            ) : null}
+                            {lastMsg?.body || 'Attachment'}
+                          </p>
+                          <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleArchive(conv.id);
+                              }}
+                              className="p-1 rounded text-[#9CA3AF] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
+                              title={archivedIds.includes(conv.id) ? 'Unarchive' : 'Archive'}
+                            >
+                              {archivedIds.includes(conv.id) ? (
+                                <ArchiveRestore className="w-3 h-3" />
+                              ) : (
+                                <Archive className="w-3 h-3" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteConversation(conv.id);
+                              }}
+                              className="p-1 rounded text-[#9CA3AF] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -664,6 +756,45 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                       }`}
                     />
                     <span className="hidden sm:inline">{refreshingThread ? 'Reloading' : 'Reload'}</span>
+                  </button>
+
+                  {/* Archive / Unarchive Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleArchive(activeData.conversation.id)}
+                    className={`inline-flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                      archivedIds.includes(activeData.conversation.id)
+                        ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                        : 'border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC]'
+                    }`}
+                    title={
+                      archivedIds.includes(activeData.conversation.id)
+                        ? 'Restore conversation from archive'
+                        : 'Move conversation to archive'
+                    }
+                  >
+                    {archivedIds.includes(activeData.conversation.id) ? (
+                      <>
+                        <ArchiveRestore className="w-3.5 h-3.5 text-[#D92228]" />
+                        <span className="hidden sm:inline">Unarchive</span>
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Archive</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Delete / Hide Chat Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteConversation(activeData.conversation.id)}
+                    className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
+                    title="Delete conversation from inbox"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
                   <select
                     value={messageRange}

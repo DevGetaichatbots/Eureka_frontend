@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { User, UserRole } from '@/types';
 import { MOCK_USERS } from '@/lib/mockData';
+import bcrypt from 'bcryptjs';
 
 export async function GET() {
   try {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
 
     const cleanEmail = email.trim().toLowerCase();
     const validRole: UserRole = role === 'admin' ? 'admin' : 'viewer';
+    const plainPassword = (password && String(password).trim()) || 'Admin@123456';
 
     if (isSupabaseConfigured()) {
       // Check for existing user
@@ -55,15 +57,15 @@ export async function POST(request: Request) {
         );
       }
 
-      // Default bcrypt hash for password or password123 ($2b$12$e8xL4sBf0M1c6I6zQ2F2e.qFzX1w2G4m7h0K3p5o9t1r2e3w4q5)
-      const defaultHash = '$2b$12$e8xL4sBf0M1c6I6zQ2F2e.qFzX1w2G4m7h0K3p5o9t1r2e3w4q5';
+      // Compute real bcrypt hash of the provided password
+      const passwordHash = bcrypt.hashSync(plainPassword, 10);
 
       const { data: inserted, error: insertError } = await supabase
         .from('app_users')
         .insert([
           {
             email: cleanEmail,
-            password_hash: defaultHash,
+            password_hash: passwordHash,
             role: validRole,
             status: 'active',
           },

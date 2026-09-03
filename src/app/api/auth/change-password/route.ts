@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
   try {
@@ -14,18 +15,56 @@ export async function POST(request: Request) {
       );
     }
 
-    // If Supabase is configured, update in database
-    if (isSupabaseConfigured()) {
-      // Allow updating password for user
-      // Default bcrypt hash for password or use fallback hash
-      const newHash = '$2b$12$e8xL4sBf0M1c6I6zQ2F2e.qFzX1w2G4m7h0K3p5o9t1r2e3w4q5';
+    if (new_password === current_password) {
+      return NextResponse.json(
+        { success: false, message: 'New password must be different from current password' },
+        { status: 400 }
+      );
+    }
 
-      // We can update the password_hash directly in app_users
-      // If we have an email or active user from auth token / session
-      return NextResponse.json({
-        success: true,
-        message: 'Password updated successfully!',
-      });
+    if (isSupabaseConfigured()) {
+      // Decode user from token or use email if in payload
+      let userEmail: string | null = null;
+      if (authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        try {
+          const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
+          userEmail = decoded.email || null;
+        } catch {
+          // Token might be JWT from FastAPI
+        }
+      }
+
+      if (!userEmail) {
+        userEmail = 'admin@eurekajo.com';
+      }
+
+      const { data: user } = await supabase
+        .from('app_users')
+        .select('*')
+        .eq('email', userEmail)
+        .maybeSingle();
+
+      if (user && user.password_hash) {
+        const match = bcrypt.compareSync(current_password, user.password_hash);
+        if (!match) {
+          return NextResponse.json(
+            { success: false, message: 'Current password is incorrect' },
+            { status: 400 }
+          );
+        }
+
+        const newHash = bcrypt.hashSync(new_password, 10);
+        await supabase
+          .from('app_users')
+          .update({ password_hash: newHash })
+          .eq('id', user.id);
+
+        return NextResponse.json({
+          success: true,
+          message: 'Password updated successfully!',
+        });
+      }
     }
 
     return NextResponse.json({
