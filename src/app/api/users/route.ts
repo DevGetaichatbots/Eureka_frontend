@@ -3,7 +3,7 @@ import { MOCK_USERS } from '@/lib/mockData';
 import { User, UserRole } from '@/types';
 
 export async function GET() {
-  return NextResponse.json(MOCK_USERS);
+  return NextResponse.json(MOCK_USERS.filter((u) => (u.status as string) !== 'deleted'));
 }
 
 export async function POST(request: Request) {

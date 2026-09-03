@@ -21,6 +21,8 @@ import {
   FileText,
   FileSpreadsheet,
   Trash2,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function UsersPage() {
@@ -31,6 +33,8 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -73,20 +77,25 @@ export default function UsersPage() {
   const handleDeleteUser = (userId: number) => {
     const target = users.find((u) => u.id === userId);
     if (target) {
+      setDeleteError(null);
       setUserToDelete(target);
     }
   };
 
   const handleConfirmDeleteUser = async () => {
-    if (!userToDelete) return;
+    if (!userToDelete || isDeleting) return;
 
+    setIsDeleting(true);
+    setDeleteError(null);
     try {
       await api.deleteUser(userToDelete.id);
       setUsers((prev) => (prev || []).filter((u) => u.id !== userToDelete.id));
-    } catch (err) {
-      console.error('Failed to delete user:', err);
-    } finally {
       setUserToDelete(null);
+    } catch (err: any) {
+      console.error('Failed to delete user:', err);
+      setDeleteError(err?.message || 'Failed to remove user account. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -284,21 +293,44 @@ export default function UsersPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-xs text-red-700 dark:text-red-400 flex items-start gap-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span className="font-medium">{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB] dark:border-[#26353d]">
               <button
                 type="button"
-                onClick={() => setUserToDelete(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+                disabled={isDeleting}
+                onClick={() => {
+                  if (!isDeleting) {
+                    setUserToDelete(null);
+                    setDeleteError(null);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] dark:border-[#26353d] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={handleConfirmDeleteUser}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Yes, Delete User</span>
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting User...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Delete User</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
