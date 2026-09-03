@@ -26,7 +26,7 @@ export default function LeadsPage() {
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
-  // Deleted leads sync with localStorage
+  // Deleted leads sync with localStorage & cross-tab / cross-component events
   const [deletedLeadKeys, setDeletedLeadKeys] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -41,19 +41,47 @@ export default function LeadsPage() {
     return new Set<string>();
   });
 
+  useEffect(() => {
+    const syncDeleted = () => {
+      try {
+        const saved = localStorage.getItem('eureka_deleted_lead_wa_ids');
+        const savedChats = localStorage.getItem('eureka_deleted_chats');
+        const set = new Set<string>();
+        if (saved) JSON.parse(saved).forEach((k: any) => set.add(String(k)));
+        if (savedChats) JSON.parse(savedChats).forEach((k: any) => set.add(String(k)));
+        setDeletedLeadKeys(set);
+      } catch {}
+    };
+
+    window.addEventListener('storage', syncDeleted);
+    window.addEventListener('eureka_deleted_updated', syncDeleted);
+    syncDeleted();
+    return () => {
+      window.removeEventListener('storage', syncDeleted);
+      window.removeEventListener('eureka_deleted_updated', syncDeleted);
+    };
+  }, []);
+
   const handleDeleteLead = (contact: Contact) => {
     setDeletedLeadKeys((prev) => {
       const next = new Set(prev);
-      if (contact.wa_id) next.add(contact.wa_id);
+      const rawWa = contact.wa_id || '';
+      const digits = rawWa.replace(/\D/g, '');
+      if (rawWa) next.add(rawWa);
+      if (digits) next.add(digits);
+      if (rawWa) next.add(`+${digits}`);
       if (contact.id) next.add(String(contact.id));
+      if ((contact as any).contact_id) next.add(String((contact as any).contact_id));
+
       if (typeof window !== 'undefined') {
         localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(next)));
         try {
           const savedChats = JSON.parse(localStorage.getItem('eureka_deleted_chats') || '[]');
           const chatSet = new Set(savedChats);
-          chatSet.add(contact.id);
+          if (contact.id) chatSet.add(contact.id);
           localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(chatSet)));
         } catch {}
+        window.dispatchEvent(new Event('eureka_deleted_updated'));
       }
       return next;
     });
@@ -95,7 +123,21 @@ export default function LeadsPage() {
   const visibleContacts = useMemo(() => {
     const safeList = contacts || [];
     return safeList.filter((c) => {
-      if (deletedLeadKeys.has(c.wa_id) || deletedLeadKeys.has(String(c.id))) return false;
+      const rawWa = c.wa_id || '';
+      const waDigits = rawWa.replace(/\D/g, '');
+      const plusWa = rawWa.startsWith('+') ? rawWa : `+${rawWa}`;
+      const idStr = String(c.id || '');
+      const contactIdStr = String((c as any).contact_id || '');
+
+      if (
+        deletedLeadKeys.has(rawWa) ||
+        (waDigits && deletedLeadKeys.has(waDigits)) ||
+        deletedLeadKeys.has(plusWa) ||
+        deletedLeadKeys.has(idStr) ||
+        deletedLeadKeys.has(contactIdStr)
+      ) {
+        return false;
+      }
       return true;
     });
   }, [contacts, deletedLeadKeys]);

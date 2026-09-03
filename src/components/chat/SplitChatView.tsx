@@ -158,10 +158,19 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         try {
           const savedWaIds = JSON.parse(localStorage.getItem('eureka_deleted_lead_wa_ids') || '[]');
           const waIdSet = new Set(savedWaIds);
-          if (waId) waIdSet.add(waId);
+          if (waId) {
+            waIdSet.add(waId);
+            const digits = waId.replace(/\D/g, '');
+            if (digits) {
+              waIdSet.add(digits);
+              waIdSet.add(`+${digits}`);
+            }
+          }
           if (contactId) waIdSet.add(String(contactId));
+          if (targetConv.id) waIdSet.add(String(targetConv.id));
           localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(waIdSet)));
         } catch {}
+        window.dispatchEvent(new Event('eureka_deleted_updated'));
       }
     }
 
@@ -169,6 +178,23 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     setActiveData(null);
     setSelectedId(null);
   };
+
+  useEffect(() => {
+    const syncDeleted = () => {
+      try {
+        const savedChats = localStorage.getItem('eureka_deleted_chats');
+        if (savedChats) {
+          setDeletedIds(new Set<number>(JSON.parse(savedChats)));
+        }
+      } catch {}
+    };
+    window.addEventListener('storage', syncDeleted);
+    window.addEventListener('eureka_deleted_updated', syncDeleted);
+    return () => {
+      window.removeEventListener('storage', syncDeleted);
+      window.removeEventListener('eureka_deleted_updated', syncDeleted);
+    };
+  }, []);
 
   // Lightbox
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
