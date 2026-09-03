@@ -61,8 +61,9 @@ export default function UsersPage() {
     try {
       const updated = await api.updateUser(userId, { status: nextStatus });
       setUsers((prev) =>
-        (prev || []).map((u) => (u.id === userId ? { ...u, status: updated.status } : u))
+        (prev || []).map((u) => (u.id === userId ? { ...u, status: updated?.status || nextStatus } : u))
       );
+      await loadUsers();
     } catch (err) {
       console.error('Failed to update status:', err);
     }
@@ -74,13 +75,15 @@ export default function UsersPage() {
     try {
       await api.deleteUser(userId);
       setUsers((prev) => (prev || []).filter((u) => u.id !== userId));
+      await loadUsers();
     } catch (err) {
       console.error('Failed to delete user:', err);
     }
   };
 
-  const handleUserCreated = (newUser: User) => {
+  const handleUserCreated = async (newUser: User) => {
     setUsers((prev) => [newUser, ...(prev || [])]);
+    await loadUsers();
   };
 
   const filteredUsers = useMemo(() => {
