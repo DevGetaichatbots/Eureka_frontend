@@ -10,9 +10,7 @@ import {
   SearchResultItem,
 } from '@/types';
 import {
-  MOCK_CONTACTS,
   MOCK_ERRORS,
-  MOCK_USERS,
 } from './mockData';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -44,32 +42,6 @@ class ApiClient {
         window.location.href = '/login';
       }
     }
-
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error(errorData.message || errorData.detail || `Request failed with status ${res.status}`);
-    }
-
-    return res.json();
-  }
-
-  private async fetchLocal<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...((options.headers as Record<string, string>) || {}),
-    };
-
-    const res = await fetch(endpoint, {
-      ...options,
-      headers: {
-        ...headers,
-        'Cache-Control': 'no-cache',
-      },
-      cache: 'no-store',
-      credentials: 'include',
-    });
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: res.statusText }));
@@ -112,17 +84,10 @@ class ApiClient {
   }
 
   async changePassword(data: { current_password: string; new_password: string }): Promise<{ success: boolean; message: string }> {
-    try {
-      return await this.fetchLocal<{ success: boolean; message: string }>('/api/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch {
-      return this.fetch<{ success: boolean; message: string }>('/api/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    }
+    return this.fetch<{ success: boolean; message: string }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // Conversations
@@ -145,19 +110,15 @@ class ApiClient {
   }
 
   // Leads
-  async getLeads(page = 1, limit = 50): Promise<PaginatedResponse<Contact>> {
-    try {
-      return await this.fetch<PaginatedResponse<Contact>>(`/api/leads?page=${page}&limit=${limit}`);
-    } catch (err) {
-      console.warn('Live backend fetch for leads failed, using fallback:', err);
-      return {
-        items: MOCK_CONTACTS,
-        total: MOCK_CONTACTS.length,
-        page,
-        limit,
-        total_pages: 1,
-      };
+  async getLeads(page = 1, limit = 50): Promise<
+    PaginatedResponse<Contact> & {
+      total_leads?: number;
+      active_leads_24h?: number;
+      total_messages?: number;
+      leads?: Contact[];
     }
+  > {
+    return this.fetch(`/api/leads?page=${page}&limit=${limit}`);
   }
 
   // Errors
@@ -170,58 +131,29 @@ class ApiClient {
     }
   }
 
-  // Users (Admin only - Direct Persistent Supabase CRUD)
+  // Users — FastAPI / Supabase only. Never fall back to mock users.
   async getUsers(): Promise<User[]> {
-    try {
-      return await this.fetchLocal<User[]>('/api/users');
-    } catch (localErr) {
-      try {
-        return await this.fetch<User[]>('/api/users');
-      } catch (err) {
-        console.warn('Live fetch for users failed, using fallback:', err);
-        return MOCK_USERS;
-      }
-    }
+    return this.fetch<User[]>('/api/users');
   }
 
   async createUser(data: { email: string; password?: string; role: string }): Promise<User> {
-    try {
-      return await this.fetchLocal<User>('/api/users', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch {
-      return this.fetch<User>('/api/users', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    }
+    return this.fetch<User>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
-    try {
-      return await this.fetchLocal<User>(`/api/users/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      });
-    } catch {
-      return this.fetch<User>(`/api/users/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-    }
+    return this.fetch<User>(`/api/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 
   async deleteUser(id: number): Promise<{ success: boolean }> {
-    try {
-      return await this.fetchLocal<{ success: boolean }>(`/api/users/${id}`, {
-        method: 'DELETE',
-      });
-    } catch {
-      return this.fetch<{ success: boolean }>(`/api/users/${id}`, {
-        method: 'DELETE',
-      });
-    }
+    return this.fetch<{ success: boolean }>(`/api/users/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   // Export URLs

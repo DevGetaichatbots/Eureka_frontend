@@ -36,7 +36,10 @@ export async function POST(request: Request) {
       }
 
       if (!userEmail) {
-        userEmail = 'admin@eurekajo.com';
+        return NextResponse.json(
+          { success: false, message: 'Not authenticated' },
+          { status: 401 }
+        );
       }
 
       const { data: user } = await supabase
@@ -67,10 +70,10 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Password updated successfully',
-    });
+    return NextResponse.json(
+      { success: false, message: 'Password was not saved to the database' },
+      { status: 500 }
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal Server Error';
     return NextResponse.json({ success: false, message }, { status: 500 });

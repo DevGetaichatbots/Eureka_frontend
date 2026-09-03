@@ -29,6 +29,7 @@ export default function LeadsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalMessagesFromApi, setTotalMessagesFromApi] = useState(0);
 
   const loadLeads = async (pageNum = 1) => {
     setLoading(true);
@@ -40,6 +41,7 @@ export default function LeadsPage() {
       setPage(res.page || 1);
       setTotalPages(res.total_pages || 1);
       setTotalItems((res as any)?.total || (res as any)?.total_leads || safeList.length);
+      setTotalMessagesFromApi(Number((res as any)?.total_messages) || 0);
     } catch (err) {
       console.error('Failed to load leads:', err);
       setContacts([]);
@@ -78,10 +80,7 @@ export default function LeadsPage() {
     return safeList.filter((c) => isWithin24Hours(c.last_seen_at)).length;
   }, [contacts]);
 
-  const totalMessagesCount = useMemo(() => {
-    const safeList = contacts || [];
-    return safeList.reduce((sum, c) => sum + (c.message_count || 0), 0);
-  }, [contacts]);
+  const totalMessagesCount = totalMessagesFromApi;
 
   // Download handlers
   const handleExportCsv = async () => {

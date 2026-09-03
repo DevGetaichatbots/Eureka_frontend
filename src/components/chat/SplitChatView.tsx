@@ -480,7 +480,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         {/* Top Control / Filter Bar */}
         <div className="p-3 border-b border-[#E5E7EB] space-y-2 bg-white">
           {/* Quick Filter Controls matching reference screenshot */}
-          <div className="flex items-center justify-between gap-1.5 text-xs">
+          <div className="flex items-center justify-between gap-1.5 text-xs overflow-x-auto">
             {/* Open Chats Dropdown */}
             <div className="relative inline-block">
               <select
@@ -530,7 +530,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by contact name or message..."
+              placeholder="Search chats by name, phone, or message..."
               className="w-full pl-8 pr-7 py-1.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#1A1A1A] placeholder-[#9CA3AF] focus:outline-none focus:ring-1 focus:ring-[#D92228] transition-all"
             />
             {searchQuery && (
@@ -719,7 +719,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         {activeData ? (
           <>
             {/* Top Contact Header Bar matching reference screenshot */}
-            <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#E5E7EB] bg-white shadow-xs z-10 flex-shrink-0 space-y-2">
+            <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#E5E7EB] bg-white shadow-xs z-10 flex-shrink-0 space-y-2 overflow-x-auto">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 {/* Mobile Back Button */}
                 <button
@@ -742,7 +742,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                     +{activeData.conversation.contact?.wa_id}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 overflow-x-auto max-w-[62%] sm:max-w-none">
                   <button
                     type="button"
                     onClick={handleRefreshThread}

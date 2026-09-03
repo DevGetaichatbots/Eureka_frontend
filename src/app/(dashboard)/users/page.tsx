@@ -66,6 +66,7 @@ export default function UsersPage() {
       await loadUsers();
     } catch (err) {
       console.error('Failed to update status:', err);
+      alert(err instanceof Error ? err.message : 'Could not update user status.');
     }
   };
 
@@ -78,6 +79,7 @@ export default function UsersPage() {
       await loadUsers();
     } catch (err) {
       console.error('Failed to delete user:', err);
+      alert(err instanceof Error ? err.message : 'Could not delete user.');
     }
   };
 
