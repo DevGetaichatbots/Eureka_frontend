@@ -16,6 +16,7 @@ import { NavRail } from '@/components/navigation/NavRail';
 import { ContactDetailsDrawer } from '@/components/chat/ContactDetailsDrawer';
 import { MessageBubble } from '@/components/thread/MessageBubble';
 import { DateDivider } from '@/components/thread/DateDivider';
+import { useAuth } from '@/context/AuthContext';
 import {
   Search,
   RefreshCw,
@@ -31,22 +32,25 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Info,
-  ExternalLink,
-  ShieldCheck,
-  Calendar,
-  Phone,
-  SlidersHorizontal,
-  Bell,
-  Tag,
-  CheckSquare,
-  Pause,
-  Play,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Filter,
+  Send,
+  Sparkles,
+  ShieldCheck,
+  SlidersHorizontal,
   Archive,
+  Star,
+  Tag,
   Trash2,
+  FolderOpen,
+  Bell,
+  CheckCircle2,
+  Maximize2,
+  Minimize2,
+  Info,
+  Filter,
   Loader2,
 } from 'lucide-react';
 
@@ -57,6 +61,8 @@ interface SplitChatViewProps {
 export function SplitChatView({ initialId }: SplitChatViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   // Selected conversation ID from URL or initialId
   const parsedId = Number(searchParams.get('id'));
@@ -1066,33 +1072,36 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                       <span className="hidden xl:inline">{refreshingThread ? 'Reloading' : 'Reload'}</span>
                     </button>
 
-                    {/* Archive Button */}
-                    <button
-                      type="button"
-                      onClick={handleToggleArchive}
-                      className={`inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-                        activeData && archivedIds.has(activeData.conversation.id)
-                          ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
-                          : 'border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4]'
-                      }`}
-                      title={activeData && archivedIds.has(activeData.conversation.id) ? 'Unarchive conversation' : 'Archive conversation'}
-                    >
-                      <Archive className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
-                      <span className="hidden xl:inline">
-                        {activeData && archivedIds.has(activeData.conversation.id) ? 'Archived' : 'Archive'}
-                      </span>
-                    </button>
+                    {/* Archive & Delete Buttons (Administrator Only) */}
+                    {isAdmin && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleToggleArchive}
+                          className={`inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                            activeData && archivedIds.has(activeData.conversation.id)
+                              ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                              : 'border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4]'
+                          }`}
+                          title={activeData && archivedIds.has(activeData.conversation.id) ? 'Unarchive conversation' : 'Archive conversation'}
+                        >
+                          <Archive className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
+                          <span className="hidden xl:inline">
+                            {activeData && archivedIds.has(activeData.conversation.id) ? 'Archived' : 'Archive'}
+                          </span>
+                        </button>
 
-                    {/* Delete Button */}
-                    <button
-                      type="button"
-                      onClick={handleDeleteConversation}
-                      className="inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
-                      title="Delete conversation from inbox"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
-                      <span className="hidden xl:inline">Delete</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={handleDeleteConversation}
+                          className="inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
+                          title="Delete conversation from inbox"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
+                          <span className="hidden xl:inline">Delete</span>
+                        </button>
+                      </>
+                    )}
 
                     <select
                       value={messageRange}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import { Contact, Message } from '@/types';
 import { api } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { formatKarachiDateTime, formatPhone, isWithin24Hours } from '@/lib/utils';
 import {
   MessageSquare,
@@ -26,6 +27,8 @@ interface LeadsTableProps {
 }
 
 export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: LeadsTableProps) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [downloadingId, setDownloadingId] = useState<{ id: number; type: 'csv' | 'xlsx' } | null>(null);
   const [leadToDelete, setLeadToDelete] = useState<Contact | null>(null);
 
@@ -300,8 +303,8 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
 
-                    {/* Delete Lead Button */}
-                    {onDeleteLead && (
+                    {/* Delete Lead Button (Administrator Only) */}
+                    {isAdmin && onDeleteLead && (
                       <button
                         type="button"
                         onClick={() => setLeadToDelete(contact)}

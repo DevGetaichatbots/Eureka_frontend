@@ -108,6 +108,31 @@ export default function UsersPage() {
     [users]
   );
 
+  if (currentUser && currentUser.role !== 'admin') {
+    return (
+      <div className="py-20 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center mx-auto border border-[#F5C2C4] shadow-sm">
+          <Lock className="w-7 h-7" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-[#1A1A1A]">Administrator Access Required</h2>
+          <p className="text-xs text-[#6B7280] mt-1 max-w-sm mx-auto">
+            Your account is set to Viewer (Read-Only). User and staff account management is restricted to Administrators.
+          </p>
+        </div>
+        <div>
+          <Link
+            href="/conversations"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] text-white hover:bg-[#B71C21] transition-colors shadow-xs"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Return to Conversations</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
