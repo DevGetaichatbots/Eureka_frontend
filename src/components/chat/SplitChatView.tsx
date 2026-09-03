@@ -145,9 +145,23 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       return next;
     });
 
-    // 2. Persist to database
+    // 2. Persist to database (including chat user name and details)
     try {
-      await api.archiveConversation(selectedId, newArchivedState);
+      const conv = conversations.find((c) => c.id === selectedId) || activeData?.conversation;
+      const contactName = conv?.contact?.profile_name || activeData?.conversation?.contact?.profile_name || 'WhatsApp Contact';
+      const waId = conv?.contact?.wa_id || activeData?.conversation?.contact?.wa_id || null;
+      const contactId = conv?.contact_id || activeData?.conversation?.contact_id || null;
+      const lastMsg = conv?.last_message?.body || (activeData?.messages?.length ? activeData.messages[activeData.messages.length - 1].body : null);
+      const msgCount = conv?.message_count || activeData?.messages?.length || 0;
+
+      await api.archiveConversation(selectedId, newArchivedState, {
+        chat_user_name: contactName,
+        wa_id: waId,
+        contact_id: contactId,
+        last_message: lastMsg,
+        message_count: msgCount,
+        archived_by_user: 'admin@eurekajo.com',
+      });
     } catch (err) {
       console.error('Failed to persist archive status to Supabase:', err);
     }

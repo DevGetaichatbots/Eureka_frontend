@@ -104,11 +104,25 @@ class ApiClient {
     return await this.fetch<{ conversation: Conversation; messages: Message[] }>(`/api/conversations/${id}`);
   }
 
-  async archiveConversation(id: number, isArchived = true): Promise<{ success: boolean; is_archived: boolean }> {
+  async archiveConversation(
+    id: number,
+    isArchived = true,
+    meta?: {
+      chat_user_name?: string | null;
+      wa_id?: string | null;
+      archived_by_user?: string | null;
+      last_message?: string | null;
+      message_count?: number;
+      contact_id?: number | null;
+    }
+  ): Promise<{ success: boolean; is_archived: boolean }> {
     try {
       return await this.fetch<{ success: boolean; is_archived: boolean }>(`/api/conversations/${id}/archive`, {
         method: 'POST',
-        body: JSON.stringify({ is_archived: isArchived }),
+        body: JSON.stringify({
+          is_archived: isArchived,
+          ...meta,
+        }),
       });
     } catch (err) {
       console.warn(`Backend archive endpoint call for #${id}:`, err);

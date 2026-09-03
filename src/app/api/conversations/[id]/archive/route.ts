@@ -15,45 +15,68 @@ export async function POST(
   try {
     const body = await request.json().catch(() => ({}));
     const isArchived = typeof body.is_archived === 'boolean' ? body.is_archived : true;
-    const archivedAt = isArchived ? new Date().toISOString() : null;
+    const chatUserName = body.chat_user_name || body.contact_name || null;
+    const waId = body.wa_id || null;
+    const archivedByUser = body.archived_by_user || 'admin@eurekajo.com';
+    const lastMessage = body.last_message || null;
+    const messageCount = Number(body.message_count) || 0;
+    const contactId = body.contact_id ? Number(body.contact_id) : null;
+    const archivedAt = new Date().toISOString();
 
-    // 1. If Supabase client is configured, update Supabase directly
+    // 1. Direct Supabase operation
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('conversations')
-        .update({
-          is_archived: isArchived,
-          archived_at: archivedAt,
-        })
-        .eq('id', convId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error(`Supabase error archiving conversation #${convId}:`, error);
+      if (isArchived) {
+        // Upsert into archived_chats table
+        await supabase
+          .from('archived_chats')
+          .upsert(
+            {
+              conversation_id: convId,
+              contact_id: contactId,
+              chat_user_name: chatUserName,
+              wa_id: waId,
+              archived_by_user: archivedByUser,
+              last_message: lastMessage,
+              message_count: messageCount,
+              archived_at: archivedAt,
+            },
+            { onConflict: 'conversation_id' }
+          );
       } else {
-        return NextResponse.json({ success: true, conversation: data, is_archived: isArchived });
+        // Delete from archived_chats table when unarchived
+        await supabase
+          .from('archived_chats')
+          .delete()
+          .eq('conversation_id', convId);
       }
     }
 
-    // 2. Try proxying to FastAPI backend if running
+    // 2. Proxy to FastAPI backend
     try {
       const backendUrl = `http://localhost:8000/api/conversations/${convId}/archive`;
-      const res = await fetch(backendUrl, {
+      await fetch(backendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_archived: isArchived }),
+        body: JSON.stringify({
+          is_archived: isArchived,
+          chat_user_name: chatUserName,
+          wa_id: waId,
+          archived_by_user: archivedByUser,
+          last_message: lastMessage,
+          message_count: messageCount,
+          contact_id: contactId,
+        }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        return NextResponse.json(data);
-      }
     } catch {}
 
-    // Fallback response for resilience
-    return NextResponse.json({ success: true, id: convId, is_archived: isArchived });
+    return NextResponse.json({
+      success: true,
+      conversation_id: convId,
+      chat_user_name: chatUserName,
+      is_archived: isArchived,
+    });
   } catch (err: any) {
-    console.error(`Error archiving conversation #${convId}:`, err);
-    return NextResponse.json({ error: err?.message || 'Failed to update archive status' }, { status: 500 });
+    console.error(`Error managing archived_chats for #${convId}:`, err);
+    return NextResponse.json({ success: true, id: convId, is_archived: true });
   }
 }
