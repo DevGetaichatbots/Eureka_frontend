@@ -78,6 +78,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed' | 'archived'>('open');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [convDateRange, setConvDateRange] = useState<'all' | 'today' | 'yesterday' | '3' | '7' | '30' | 'custom'>('all');
+  const [convCustomStart, setConvCustomStart] = useState('');
+  const [convCustomEnd, setConvCustomEnd] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(urlId || null);
   const [mobileView, setMobileView] = useState<'list' | 'chat'>(urlId ? 'chat' : 'list');
 
@@ -667,6 +670,47 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           return !isWithin24Hours(conv.last_message_at);
         }
 
+        // Date range filtering on conversations list based on latest activity
+        if (convDateRange !== 'all') {
+          const todayKey = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Karachi',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date());
+
+          const convDate = karachiDateKey(conv.last_message_at || conv.last_message?.sent_at || conv.started_at);
+          if (!convDate) return false;
+
+          if (convDateRange === 'today') {
+            if (convDate !== todayKey) return false;
+          } else if (convDateRange === 'yesterday') {
+            const yd = new Date();
+            yd.setDate(yd.getDate() - 1);
+            const yesterdayKey = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Asia/Karachi',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+            }).format(yd);
+            if (convDate !== yesterdayKey) return false;
+          } else if (convDateRange === 'custom') {
+            if (convCustomStart && convDate < convCustomStart) return false;
+            if (convCustomEnd && convDate > convCustomEnd) return false;
+          } else {
+            const days = Number(convDateRange);
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
+            const cutoffKey = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Asia/Karachi',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+            }).format(cutoffDate);
+            if (convDate < cutoffKey) return false;
+          }
+        }
+
         return true;
       })
       .sort((a, b) => {
@@ -682,7 +726,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       seen.add(key);
       return true;
     });
-  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder, archivedIds, deletedIds]);
+  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder, archivedIds, deletedIds, convDateRange, convCustomStart, convCustomEnd]);
 
   // Select a conversation — state-driven, no URL navigation to avoid re-render conflicts
   const handleSelectConversation = (id: number) => {
@@ -715,11 +759,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           {/* Quick Filter Controls matching reference screenshot */}
           <div className="flex items-center justify-between gap-1.5 text-xs">
             {/* Open Chats Dropdown */}
-            <div className="relative inline-block">
+            <div className="relative inline-block flex-1 min-w-0">
               <select
                 value={chatFilter}
                 onChange={(e) => setChatFilter(e.target.value as any)}
-                className="appearance-none pl-2.5 pr-6 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
+                className="w-full appearance-none pl-2.5 pr-6 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer truncate"
               >
                 <option value="open">💬 Open Chats</option>
                 <option value="active24h">🔥 Active 24h</option>
@@ -733,7 +777,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
             <button
               type="button"
               onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer flex-shrink-0 ${
                 showUnreadOnly
                   ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
                   : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'
@@ -743,18 +787,79 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
             </button>
 
             {/* Sort: Newest ▾ Dropdown */}
-            <div className="relative inline-block">
+            <div className="relative inline-block flex-shrink-0">
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as any)}
                 className="appearance-none pl-2.5 pr-6 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
               >
-                <option value="newest">⇅ Sort: Newest</option>
-                <option value="oldest">⇅ Sort: Oldest</option>
+                <option value="newest">⇅ Newest</option>
+                <option value="oldest">⇅ Oldest</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
+
+          {/* Date Filter Bar for Conversation List matching middle-panel styling */}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="relative flex-1 min-w-0">
+              <select
+                value={convDateRange}
+                onChange={(e) => setConvDateRange(e.target.value as typeof convDateRange)}
+                className={`w-full appearance-none pl-2.5 pr-6 py-1.5 rounded-lg border text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer transition-colors ${
+                  convDateRange !== 'all'
+                    ? 'border-[#D92228] bg-[#FDEBEC] text-[#D92228] font-bold'
+                    : 'border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-[#1A1A1A]'
+                }`}
+                title="Filter conversations by date"
+              >
+                <option value="all">📅 All Dates</option>
+                <option value="today">📅 Today</option>
+                <option value="yesterday">📅 Yesterday</option>
+                <option value="3">📅 Last 3 days</option>
+                <option value="7">📅 Last 7 days</option>
+                <option value="30">📅 Last 30 days</option>
+                <option value="custom">📅 Custom calendar</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {convDateRange !== 'all' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setConvDateRange('all');
+                  setConvCustomStart('');
+                  setConvCustomEnd('');
+                }}
+                className="p-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] hover:bg-[#F5C2C4] transition-colors cursor-pointer flex-shrink-0"
+                title="Clear conversation date filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Custom Date Pickers */}
+          {convDateRange === 'custom' && (
+            <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] animate-in fade-in duration-150">
+              <input
+                type="date"
+                value={convCustomStart}
+                onChange={(e) => setConvCustomStart(e.target.value)}
+                className="flex-1 min-w-0 px-1.5 py-1 rounded border border-[#E5E7EB] bg-white text-[11px] text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228]"
+                title="From date"
+              />
+              <span className="text-[10px] text-[#9CA3AF] font-medium">to</span>
+              <input
+                type="date"
+                value={convCustomEnd}
+                onChange={(e) => setConvCustomEnd(e.target.value)}
+                className="flex-1 min-w-0 px-1.5 py-1 rounded border border-[#E5E7EB] bg-white text-[11px] text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228]"
+                title="To date"
+              />
+            </div>
+          )}
 
           {/* Quick Search input within list */}
           <div className="relative">
@@ -776,6 +881,28 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               </button>
             )}
           </div>
+
+          {/* Active Filter Result Counter & Reset Button */}
+          {(convDateRange !== 'all' || searchQuery.trim()) && (
+            <div className="flex items-center justify-between px-2 py-1 rounded-md bg-[#FDEBEC] border border-[#F5C2C4] text-[11px] text-[#D92228] font-semibold animate-in fade-in">
+              <span className="flex items-center gap-1">
+                <Filter className="w-3 h-3" />
+                {filteredConversations.length} conversation{filteredConversations.length === 1 ? '' : 's'} found
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setConvDateRange('all');
+                  setConvCustomStart('');
+                  setConvCustomEnd('');
+                  setSearchQuery('');
+                }}
+                className="text-[10px] underline hover:text-[#B71C21] cursor-pointer"
+              >
+                Reset
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Conversation Items List */}
