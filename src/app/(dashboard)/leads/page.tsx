@@ -62,76 +62,36 @@ export default function LeadsPage() {
     };
   }, []);
 
-  // Synchronize any previously deleted conversations from /conversations by looking up their contact WA_IDs
-  useEffect(() => {
-    async function resolveDeletedConversations() {
-      try {
-        const savedChats = localStorage.getItem('eureka_deleted_chats');
-        if (!savedChats) return;
-        const deletedChatIds = new Set<number>(JSON.parse(savedChats));
-        if (deletedChatIds.size === 0) return;
 
-        const res = await api.getConversations();
-        const convList = res.items || [];
-        const waIdSet = new Set<string>();
 
-        convList.forEach((conv) => {
-          if (deletedChatIds.has(conv.id)) {
-            if (conv.contact_id) waIdSet.add(String(conv.contact_id));
-            if (conv.contact?.id) waIdSet.add(String(conv.contact.id));
-            if (conv.contact?.wa_id) {
-              const raw = conv.contact.wa_id;
-              const digits = raw.replace(/\D/g, '');
-              waIdSet.add(raw);
-              if (digits) {
-                waIdSet.add(digits);
-                waIdSet.add(`+${digits}`);
-              }
-            }
-          }
-        });
+  const handleDeleteLead = async (contact: Contact) => {
+    const rawWa = contact.wa_id || '';
+    const digits = rawWa.replace(/\D/g, '');
+    const idStr = String(contact.id || '');
 
-        if (waIdSet.size > 0) {
-          const savedWa = JSON.parse(localStorage.getItem('eureka_deleted_lead_wa_ids') || '[]');
-          savedWa.forEach((w: string) => waIdSet.add(w));
-          deletedChatIds.forEach((id) => waIdSet.add(String(id)));
-          localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(waIdSet)));
-          setDeletedLeadKeys((prev) => {
-            const next = new Set(prev);
-            waIdSet.forEach((w) => next.add(w));
-            return next;
-          });
-        }
-      } catch (err) {
-        console.error('Failed to resolve deleted conversations in leads page:', err);
-      }
-    }
-    resolveDeletedConversations();
-  }, []);
-
-  const handleDeleteLead = (contact: Contact) => {
     setDeletedLeadKeys((prev) => {
       const next = new Set(prev);
-      const rawWa = contact.wa_id || '';
-      const digits = rawWa.replace(/\D/g, '');
       if (rawWa) next.add(rawWa);
       if (digits) next.add(digits);
       if (rawWa) next.add(`+${digits}`);
-      if (contact.id) next.add(String(contact.id));
-      if ((contact as any).contact_id) next.add(String((contact as any).contact_id));
+      if (idStr) next.add(idStr);
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(next)));
-        try {
-          const savedChats = JSON.parse(localStorage.getItem('eureka_deleted_chats') || '[]');
-          const chatSet = new Set(savedChats);
-          if (contact.id) chatSet.add(contact.id);
-          localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(chatSet)));
-        } catch {}
         window.dispatchEvent(new Event('eureka_deleted_updated'));
       }
       return next;
     });
+
+    try {
+      await api.deleteConversation(contact.id, {
+        contact_id: contact.id,
+        wa_id: contact.wa_id,
+        deleted_by_user: 'admin@eurekajo.com',
+      });
+    } catch (err) {
+      console.error('Failed to record deleted lead in Supabase:', err);
+    }
   };
 
   const [page, setPage] = useState(1);
@@ -148,6 +108,27 @@ export default function LeadsPage() {
       setPage(res.page || 1);
       setTotalPages(res.total_pages || 1);
       setTotalItems((res as any)?.total || (res as any)?.total_leads || safeList.length);
+
+      // If server returns active verified leads, un-suppress any revived leads in UI
+      if (safeList.length > 0) {
+        setDeletedLeadKeys((prev) => {
+          let changed = false;
+          const next = new Set(prev);
+          safeList.forEach((c) => {
+            const rawWa = c.wa_id || '';
+            const digits = rawWa.replace(/\D/g, '');
+            const idStr = String(c.id || '');
+            if (next.has(rawWa)) { next.delete(rawWa); changed = true; }
+            if (digits && next.has(digits)) { next.delete(digits); changed = true; }
+            if (next.has(`+${digits}`)) { next.delete(`+${digits}`); changed = true; }
+            if (next.has(idStr)) { next.delete(idStr); changed = true; }
+          });
+          if (changed && typeof window !== 'undefined') {
+            localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(next)));
+          }
+          return changed ? next : prev;
+        });
+      }
     } catch (err) {
       console.error('Failed to load leads:', err);
       setContacts([]);
@@ -159,6 +140,12 @@ export default function LeadsPage() {
 
   useEffect(() => {
     loadLeads(page);
+    // Poller to update leads in real-time
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadLeads(page);
+    }, 10000);
+    return () => clearInterval(timer);
   }, [page]);
 
   const handleRefresh = () => {
