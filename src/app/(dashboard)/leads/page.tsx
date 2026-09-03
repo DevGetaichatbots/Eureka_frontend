@@ -26,6 +26,39 @@ export default function LeadsPage() {
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
+  // Deleted leads sync with localStorage
+  const [deletedLeadKeys, setDeletedLeadKeys] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('eureka_deleted_lead_wa_ids');
+        const savedChats = localStorage.getItem('eureka_deleted_chats');
+        const set = new Set<string>();
+        if (saved) JSON.parse(saved).forEach((k: any) => set.add(String(k)));
+        if (savedChats) JSON.parse(savedChats).forEach((k: any) => set.add(String(k)));
+        return set;
+      } catch {}
+    }
+    return new Set<string>();
+  });
+
+  const handleDeleteLead = (contact: Contact) => {
+    setDeletedLeadKeys((prev) => {
+      const next = new Set(prev);
+      if (contact.wa_id) next.add(contact.wa_id);
+      if (contact.id) next.add(String(contact.id));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(next)));
+        try {
+          const savedChats = JSON.parse(localStorage.getItem('eureka_deleted_chats') || '[]');
+          const chatSet = new Set(savedChats);
+          chatSet.add(contact.id);
+          localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(chatSet)));
+        } catch {}
+      }
+      return next;
+    });
+  };
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -58,9 +91,18 @@ export default function LeadsPage() {
     loadLeads(page);
   };
 
+  // Contacts excluding deleted ones
+  const visibleContacts = useMemo(() => {
+    const safeList = contacts || [];
+    return safeList.filter((c) => {
+      if (deletedLeadKeys.has(c.wa_id) || deletedLeadKeys.has(String(c.id))) return false;
+      return true;
+    });
+  }, [contacts, deletedLeadKeys]);
+
   // Client-side search filtering
   const filteredContacts = useMemo(() => {
-    const safeList = contacts || [];
+    const safeList = visibleContacts || [];
     if (!searchQuery) return safeList;
     const q = searchQuery.toLowerCase().trim();
     const digits = q.replace(/\D/g, '');
@@ -70,18 +112,18 @@ export default function LeadsPage() {
       const phoneMatch = digits.length >= 3 && c.wa_id.includes(digits);
       return nameMatch || phoneMatch;
     });
-  }, [contacts, searchQuery]);
+  }, [visibleContacts, searchQuery]);
 
-  // Metrics
+  // Metrics based on visible (non-deleted) contacts
   const activeLeadsCount = useMemo(() => {
-    const safeList = contacts || [];
+    const safeList = visibleContacts || [];
     return safeList.filter((c) => isWithin24Hours(c.last_seen_at)).length;
-  }, [contacts]);
+  }, [visibleContacts]);
 
   const totalMessagesCount = useMemo(() => {
-    const safeList = contacts || [];
+    const safeList = visibleContacts || [];
     return safeList.reduce((sum, c) => sum + (c.message_count || 0), 0);
-  }, [contacts]);
+  }, [visibleContacts]);
 
   // Download handlers
   const handleExportCsv = async () => {
@@ -195,7 +237,7 @@ export default function LeadsPage() {
 
       {/* Summary Cards */}
       <LeadsSummaryCards
-        totalLeads={contacts.length}
+        totalLeads={visibleContacts.length}
         activeLeads={activeLeadsCount}
         totalMessages={totalMessagesCount}
       />
@@ -230,13 +272,14 @@ export default function LeadsPage() {
           contacts={filteredContacts}
           loading={loading}
           searchQuery={searchQuery}
+          onDeleteLead={handleDeleteLead}
         />
 
         {/* Pagination Bar */}
         <PaginationBar
           page={page}
           totalPages={totalPages}
-          totalItems={totalItems}
+          totalItems={visibleContacts.length}
           limit={50}
           itemName="leads"
           onPageChange={(newPage) => setPage(newPage)}

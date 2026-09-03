@@ -15,16 +15,19 @@ import {
   FileText,
   FileSpreadsheet,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 
 interface LeadsTableProps {
   contacts: Contact[];
   loading: boolean;
   searchQuery: string;
+  onDeleteLead?: (contact: Contact) => void;
 }
 
-export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) {
+export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: LeadsTableProps) {
   const [downloadingId, setDownloadingId] = useState<{ id: number; type: 'csv' | 'xlsx' } | null>(null);
+  const [leadToDelete, setLeadToDelete] = useState<Contact | null>(null);
 
   const fetchLeadMessages = async (contactId: number): Promise<Message[]> => {
     try {
@@ -296,6 +299,18 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
                       <span>View Chat</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
+
+                    {/* Delete Lead Button */}
+                    {onDeleteLead && (
+                      <button
+                        type="button"
+                        onClick={() => setLeadToDelete(contact)}
+                        className="p-1.5 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-all cursor-pointer"
+                        title={`Delete lead for ${name}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-[#D92228]" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -303,6 +318,55 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
           })}
         </tbody>
       </table>
+
+      {/* Delete Lead Confirmation Popup Modal */}
+      {leadToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center flex-shrink-0 border border-[#F5C2C4]">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-[#1A1A1A]">
+                  Delete Lead Contact?
+                </h3>
+                <p className="text-xs text-[#6B7280] mt-1.5 leading-relaxed">
+                  Are you sure you want to remove{' '}
+                  <span className="font-semibold text-[#1A1A1A]">
+                    {leadToDelete.profile_name || 'this contact'}
+                  </span>{' '}
+                  ({formatPhone(leadToDelete.wa_id)}) from your Leads view?
+                </p>
+                <div className="mt-2.5 p-2.5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] text-[#6B7280]">
+                  <span className="font-semibold text-[#1A1A1A]">🔒 Database Safe:</span> All messages and historical logs remain securely preserved in your Supabase database.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
+              <button
+                type="button"
+                onClick={() => setLeadToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteLead?.(leadToDelete);
+                  setLeadToDelete(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Yes, Delete Lead</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

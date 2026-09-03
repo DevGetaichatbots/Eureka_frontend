@@ -142,6 +142,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   const handleConfirmDelete = () => {
     if (!selectedId) return;
+    const targetConv = conversations.find((c) => c.id === selectedId) || activeData?.conversation;
     setDeletedIds((prev) => {
       const next = new Set(prev).add(selectedId);
       if (typeof window !== 'undefined') {
@@ -149,6 +150,21 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       }
       return next;
     });
+
+    if (targetConv) {
+      const waId = targetConv.contact?.wa_id;
+      const contactId = targetConv.contact_id || targetConv.contact?.id;
+      if (typeof window !== 'undefined') {
+        try {
+          const savedWaIds = JSON.parse(localStorage.getItem('eureka_deleted_lead_wa_ids') || '[]');
+          const waIdSet = new Set(savedWaIds);
+          if (waId) waIdSet.add(waId);
+          if (contactId) waIdSet.add(String(contactId));
+          localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(waIdSet)));
+        } catch {}
+      }
+    }
+
     setShowDeleteModal(false);
     setActiveData(null);
     setSelectedId(null);
