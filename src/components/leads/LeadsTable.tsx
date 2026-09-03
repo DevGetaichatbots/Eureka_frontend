@@ -55,7 +55,7 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
       csvLines.push(`"Raw WA ID","${contact.wa_id}"`);
       csvLines.push(`"First Contact (PKT)","${formatKarachiDateTime(contact.first_seen_at)}"`);
       csvLines.push(`"Last Activity (PKT)","${formatKarachiDateTime(contact.last_seen_at)}"`);
-      csvLines.push(`"Total Messages","${contact.message_count || messages.length}"`);
+      csvLines.push(`"Total Messages","${messages.length}"`);
       csvLines.push('');
       csvLines.push('"--- MESSAGE HISTORY ---"');
       csvLines.push('"Message ID","Direction","Date & Time (PKT)","Type","Message Body"');
@@ -97,7 +97,7 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
         { Field: 'Raw WA ID', Value: contact.wa_id },
         { Field: 'First Contact (PKT)', Value: formatKarachiDateTime(contact.first_seen_at) },
         { Field: 'Last Activity (PKT)', Value: formatKarachiDateTime(contact.last_seen_at) },
-        { Field: 'Total Messages', Value: contact.message_count || messages.length },
+        { Field: 'Total Messages', Value: messages.length },
       ];
 
       const messagesData = messages.map((m) => ({
