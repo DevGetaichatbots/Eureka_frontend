@@ -181,9 +181,16 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     const waId = targetConv?.contact?.wa_id || null;
     const contactId = targetConv?.contact_id || targetConv?.contact?.id || null;
 
-    // 1. Instantly hide from frontend UI state
+    // 1. Instantly hide all conversations for this contact from frontend UI state
     setDeletedIds((prev) => {
       const next = new Set(prev).add(deletedConvId);
+      if (contactId) {
+        conversations.forEach((c) => {
+          if (c.contact_id === contactId || c.contact?.id === contactId) {
+            next.add(c.id);
+          }
+        });
+      }
       if (typeof window !== 'undefined') {
         localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(next)));
       }
