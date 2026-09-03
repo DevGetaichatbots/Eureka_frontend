@@ -214,6 +214,34 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       setListError(null);
 
       setSelectedId((prev) => (prev ? prev : (res.items.length > 0 ? res.items[0].id : null)));
+
+      // Auto-sync all deleted conversation IDs to their contact phone numbers in localStorage
+      if (typeof window !== 'undefined' && res.items?.length) {
+        try {
+          const savedChats = localStorage.getItem('eureka_deleted_chats');
+          if (savedChats) {
+            const delSet = new Set<number>(JSON.parse(savedChats));
+            const waIdSet = new Set<string>(JSON.parse(localStorage.getItem('eureka_deleted_lead_wa_ids') || '[]'));
+            res.items.forEach((conv) => {
+              if (delSet.has(conv.id)) {
+                if (conv.contact_id) waIdSet.add(String(conv.contact_id));
+                if (conv.contact?.id) waIdSet.add(String(conv.contact.id));
+                if (conv.contact?.wa_id) {
+                  const raw = conv.contact.wa_id;
+                  const digits = raw.replace(/\D/g, '');
+                  waIdSet.add(raw);
+                  if (digits) {
+                    waIdSet.add(digits);
+                    waIdSet.add(`+${digits}`);
+                  }
+                }
+              }
+            });
+            localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(waIdSet)));
+            window.dispatchEvent(new Event('eureka_deleted_updated'));
+          }
+        } catch {}
+      }
     } catch (err: any) {
       console.error('Failed to load conversations:', err);
       if (showLoading) {

@@ -62,6 +62,53 @@ export default function LeadsPage() {
     };
   }, []);
 
+  // Synchronize any previously deleted conversations from /conversations by looking up their contact WA_IDs
+  useEffect(() => {
+    async function resolveDeletedConversations() {
+      try {
+        const savedChats = localStorage.getItem('eureka_deleted_chats');
+        if (!savedChats) return;
+        const deletedChatIds = new Set<number>(JSON.parse(savedChats));
+        if (deletedChatIds.size === 0) return;
+
+        const res = await api.getConversations();
+        const convList = res.items || [];
+        const waIdSet = new Set<string>();
+
+        convList.forEach((conv) => {
+          if (deletedChatIds.has(conv.id)) {
+            if (conv.contact_id) waIdSet.add(String(conv.contact_id));
+            if (conv.contact?.id) waIdSet.add(String(conv.contact.id));
+            if (conv.contact?.wa_id) {
+              const raw = conv.contact.wa_id;
+              const digits = raw.replace(/\D/g, '');
+              waIdSet.add(raw);
+              if (digits) {
+                waIdSet.add(digits);
+                waIdSet.add(`+${digits}`);
+              }
+            }
+          }
+        });
+
+        if (waIdSet.size > 0) {
+          const savedWa = JSON.parse(localStorage.getItem('eureka_deleted_lead_wa_ids') || '[]');
+          savedWa.forEach((w: string) => waIdSet.add(w));
+          deletedChatIds.forEach((id) => waIdSet.add(String(id)));
+          localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(waIdSet)));
+          setDeletedLeadKeys((prev) => {
+            const next = new Set(prev);
+            waIdSet.forEach((w) => next.add(w));
+            return next;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to resolve deleted conversations in leads page:', err);
+      }
+    }
+    resolveDeletedConversations();
+  }, []);
+
   const handleDeleteLead = (contact: Contact) => {
     setDeletedLeadKeys((prev) => {
       const next = new Set(prev);
