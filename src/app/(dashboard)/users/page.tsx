@@ -257,6 +257,7 @@ export default function UsersPage() {
         <UsersTable
           users={filteredUsers}
           currentUserId={currentUser?.id || 1}
+          currentUserEmail={currentUser?.email}
           onToggleStatus={handleToggleStatus}
           onDeleteUser={handleDeleteUser}
         />
