@@ -17,11 +17,14 @@ export async function POST(request: Request) {
     const cleanEmail = email.trim().toLowerCase();
 
     if (isSupabaseConfigured()) {
-      const { data: user, error } = await supabase
+      const { data: users, error } = await supabase
         .from('app_users')
         .select('*')
         .eq('email', cleanEmail)
-        .maybeSingle();
+        .order('id', { ascending: false })
+        .limit(1);
+
+      const user = users?.[0];
 
       if (error || !user) {
         return NextResponse.json(

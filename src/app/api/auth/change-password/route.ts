@@ -58,14 +58,21 @@ export async function POST(request: Request) {
         }
 
         const newHash = bcrypt.hashSync(new_password, 10);
-        await supabase
+        const { error: updateError } = await supabase
           .from('app_users')
           .update({ password_hash: newHash })
-          .eq('id', user.id);
+          .eq('email', userEmail.toLowerCase());
+
+        if (updateError) {
+          return NextResponse.json(
+            { success: false, message: 'Password could not be saved' },
+            { status: 500 }
+          );
+        }
 
         return NextResponse.json({
           success: true,
-          message: 'Password updated successfully!',
+          message: 'Password updated. The previous password will no longer work.',
         });
       }
     }
