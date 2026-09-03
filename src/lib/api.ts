@@ -16,7 +16,6 @@ import {
 } from './mockData';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const USE_MOCK = false;
 
 class ApiClient {
   private async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -45,6 +44,32 @@ class ApiClient {
         window.location.href = '/login';
       }
     }
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(errorData.message || errorData.detail || `Request failed with status ${res.status}`);
+    }
+
+    return res.json();
+  }
+
+  private async fetchLocal<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...((options.headers as Record<string, string>) || {}),
+    };
+
+    const res = await fetch(endpoint, {
+      ...options,
+      headers: {
+        ...headers,
+        'Cache-Control': 'no-cache',
+      },
+      cache: 'no-store',
+      credentials: 'include',
+    });
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: res.statusText }));
@@ -87,10 +112,17 @@ class ApiClient {
   }
 
   async changePassword(data: { current_password: string; new_password: string }): Promise<{ success: boolean; message: string }> {
-    return this.fetch<{ success: boolean; message: string }>('/api/auth/change-password', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await this.fetchLocal<{ success: boolean; message: string }>('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch {
+      return this.fetch<{ success: boolean; message: string }>('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    }
   }
 
   // Conversations
@@ -138,34 +170,58 @@ class ApiClient {
     }
   }
 
-  // Users (Admin only)
+  // Users (Admin only - Direct Persistent Supabase CRUD)
   async getUsers(): Promise<User[]> {
     try {
-      return await this.fetch<User[]>('/api/users');
-    } catch (err) {
-      console.warn('Live backend fetch for users failed, using fallback:', err);
-      return MOCK_USERS;
+      return await this.fetchLocal<User[]>('/api/users');
+    } catch (localErr) {
+      try {
+        return await this.fetch<User[]>('/api/users');
+      } catch (err) {
+        console.warn('Live fetch for users failed, using fallback:', err);
+        return MOCK_USERS;
+      }
     }
   }
 
   async createUser(data: { email: string; password?: string; role: string }): Promise<User> {
-    return this.fetch<User>('/api/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await this.fetchLocal<User>('/api/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch {
+      return this.fetch<User>('/api/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    }
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
-    return this.fetch<User>(`/api/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await this.fetchLocal<User>(`/api/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    } catch {
+      return this.fetch<User>(`/api/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    }
   }
 
   async deleteUser(id: number): Promise<{ success: boolean }> {
-    return this.fetch<{ success: boolean }>(`/api/users/${id}`, {
-      method: 'DELETE',
-    });
+    try {
+      return await this.fetchLocal<{ success: boolean }>(`/api/users/${id}`, {
+        method: 'DELETE',
+      });
+    } catch {
+      return this.fetch<{ success: boolean }>(`/api/users/${id}`, {
+        method: 'DELETE',
+      });
+    }
   }
 
   // Export URLs
