@@ -1,14 +1,12 @@
 {
-  "name": "eureka-web-project",
+  "name": "frontend",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "frontend"
-  ],
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
-    "build": "cd frontend && npm install && npm run build && cp -r .next/static .next/standalone/.next/ 2>/dev/null || true && cp -r public .next/standalone/ 2>/dev/null || true && cd .. && cp -r frontend/.next . && cp -r frontend/public . 2>/dev/null || true",
-    "start": "node .next/standalone/server.js || node frontend/.next/standalone/server.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

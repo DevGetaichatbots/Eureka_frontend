@@ -2,7 +2,7 @@ services:
   - type: web
     name: eureka-frontend
     runtime: node
-    buildCommand: npm install && npm run build && cp -r .next/static .next/standalone/.next/ 2>/dev/null || true && cp -r public .next/standalone/ 2>/dev/null || true
+    buildCommand: npm install && npm run build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/
     startCommand: HOSTNAME=0.0.0.0 PORT=10000 node .next/standalone/server.js
     envVars:
       - key: NODE_ENV

@@ -43,4 +43,6 @@ coverage/
 Thumbs.db
 *.tsbuildinfo
 .agents/
+frontend/
+
 
