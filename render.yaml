@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: eureka-frontend
+    runtime: node
+    buildCommand: npm install && npm run build && cp -r .next/static .next/standalone/.next/ 2>/dev/null || true && cp -r public .next/standalone/ 2>/dev/null || true
+    startCommand: HOSTNAME=0.0.0.0 PORT=10000 node .next/standalone/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://eureka-backend-6dh0.onrender.com
+      - key: NEXT_PUBLIC_USE_MOCK
+        value: "false"
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://kwmwnqrmfershspfkcws.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bXducXJtZmVyc2hzcGZrY3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5MTIyNTcsImV4cCI6MjA4NDQ4ODI1N30.wXVyh3D-TXq2G9t5cqs3NkaeJXOcMgczOpJlxH8TB8A
+      - key: PORT
+        value: "10000"

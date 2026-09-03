@@ -1,0 +1,31 @@
+{
+  "name": "eureka-web-project",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "cd frontend && npm install && npm run build && cp -r .next/static .next/standalone/.next/ 2>/dev/null || true && cp -r public .next/standalone/ 2>/dev/null || true && cd .. && cp -r frontend/.next . && cp -r frontend/public . 2>/dev/null || true",
+    "start": "node .next/standalone/server.js || node frontend/.next/standalone/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
+    "lucide-react": "^1.35.0",
+    "next": "16.3.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
