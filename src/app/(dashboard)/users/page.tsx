@@ -20,6 +20,7 @@ import {
   X,
   FileText,
   FileSpreadsheet,
+  Trash2,
 } from 'lucide-react';
 
 export default function UsersPage() {
@@ -29,6 +30,7 @@ export default function UsersPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -68,14 +70,23 @@ export default function UsersPage() {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm('Are you sure you want to remove this user login?')) return;
+  const handleDeleteUser = (userId: number) => {
+    const target = users.find((u) => u.id === userId);
+    if (target) {
+      setUserToDelete(target);
+    }
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
-      await api.deleteUser(userId);
-      setUsers((prev) => (prev || []).filter((u) => u.id !== userId));
+      await api.deleteUser(userToDelete.id);
+      setUsers((prev) => (prev || []).filter((u) => u.id !== userToDelete.id));
     } catch (err) {
       console.error('Failed to delete user:', err);
+    } finally {
+      setUserToDelete(null);
     }
   };
 
@@ -223,6 +234,51 @@ export default function UsersPage() {
         onClose={() => setIsModalOpen(false)}
         onUserCreated={handleUserCreated}
       />
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center flex-shrink-0 border border-[#F5C2C4]">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-[#1A1A1A]">
+                  Delete User Access?
+                </h3>
+                <p className="text-xs text-[#6B7280] mt-1.5 leading-relaxed">
+                  Are you sure you want to remove the account for{' '}
+                  <span className="font-semibold text-[#1A1A1A]">
+                    {userToDelete.email}
+                  </span>?
+                </p>
+                <div className="mt-2.5 p-2.5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] text-[#6B7280]">
+                  <span className="font-semibold text-[#1A1A1A]">🔒 Safe & Audited:</span> Their login session will be revoked immediately while past message logs and historical CRM records remain preserved.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUser}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Yes, Delete User</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

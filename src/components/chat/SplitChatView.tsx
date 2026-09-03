@@ -117,6 +117,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     return new Set<number>();
   });
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   const handleToggleArchive = () => {
     if (!selectedId) return;
     setArchivedIds((prev) => {
@@ -135,17 +137,21 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   const handleDeleteConversation = () => {
     if (!selectedId) return;
-    if (window.confirm('Are you sure you want to delete this conversation from your inbox view?')) {
-      setDeletedIds((prev) => {
-        const next = new Set(prev).add(selectedId);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(next)));
-        }
-        return next;
-      });
-      setActiveData(null);
-      setSelectedId(null);
-    }
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!selectedId) return;
+    setDeletedIds((prev) => {
+      const next = new Set(prev).add(selectedId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(next)));
+      }
+      return next;
+    });
+    setShowDeleteModal(false);
+    setActiveData(null);
+    setSelectedId(null);
   };
 
   // Lightbox
@@ -1087,6 +1093,52 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           totalMessages={activeData.messages.length}
           onClose={() => setShowDetails(false)}
         />
+      )}
+
+      {/* Delete Confirmation Popup Modal */}
+      {showDeleteModal && activeData && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center flex-shrink-0 border border-[#F5C2C4]">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-[#1A1A1A]">
+                  Delete Conversation?
+                </h3>
+                <p className="text-xs text-[#6B7280] mt-1.5 leading-relaxed">
+                  Are you sure you want to remove the conversation with{' '}
+                  <span className="font-semibold text-[#1A1A1A]">
+                    {activeData.conversation.contact?.profile_name || 'this contact'}
+                  </span>{' '}
+                  from your inbox view?
+                </p>
+                <div className="mt-2.5 p-2.5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] text-[#6B7280]">
+                  <span className="font-semibold text-[#1A1A1A]">🔒 Database Safe:</span> All messages and historical records remain permanently preserved and securely archived in your Supabase database.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Yes, Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Lightbox Modal */}
