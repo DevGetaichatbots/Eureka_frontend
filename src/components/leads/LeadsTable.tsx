@@ -143,7 +143,7 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
     return (
       <div className="divide-y divide-gray-100 dark:divide-[#222e35]">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="p-5 flex items-center justify-between gap-4 animate-pulse">
+          <div key={i} className="p-4 sm:p-5 flex items-center justify-between gap-4 animate-pulse">
             <div className="flex items-center gap-3.5 flex-1">
               <div className="w-10 h-10 rounded-2xl bg-gray-200 dark:bg-[#202c33]" />
               <div className="space-y-1.5 flex-1 max-w-xs">
@@ -178,131 +178,215 @@ export function LeadsTable({ contacts, loading, searchQuery }: LeadsTableProps) 
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[650px] text-left border-collapse">
-        <thead>
-          <tr className="border-b border-[#E5E7EB] dark:border-[#26353d] bg-[#F9FAFB] dark:bg-[#202c33]/40 text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-wider">
-            <th className="py-3.5 px-4 sm:px-6">Contact & Phone</th>
-            <th className="py-3.5 px-4 hidden md:table-cell">First Contact</th>
-            <th className="py-3.5 px-4">Last Activity</th>
-            <th className="py-3.5 px-4 text-center">Messages</th>
-            <th className="py-3.5 px-4 sm:px-6 text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#26353d] text-xs">
-          {contacts.map((contact) => {
-            const active = isWithin24Hours(contact.last_seen_at);
-            const name = contact.profile_name || 'WhatsApp User';
-            const phone = formatPhone(contact.wa_id);
-            const isDownloadingCsv = downloadingId?.id === contact.id && downloadingId.type === 'csv';
-            const isDownloadingXlsx = downloadingId?.id === contact.id && downloadingId.type === 'xlsx';
+    <>
+      {/* Mobile Card Layout (< md screens) */}
+      <div className="md:hidden divide-y divide-[#E5E7EB] dark:divide-[#26353d]">
+        {contacts.map((contact) => {
+          const active = isWithin24Hours(contact.last_seen_at);
+          const name = contact.profile_name || 'WhatsApp User';
+          const phone = formatPhone(contact.wa_id);
+          const isDownloadingCsv = downloadingId?.id === contact.id && downloadingId.type === 'csv';
+          const isDownloadingXlsx = downloadingId?.id === contact.id && downloadingId.type === 'xlsx';
 
-            return (
-              <tr
-                key={contact.id}
-                className="hover:bg-[#F9FAFB] dark:hover:bg-[#202c33]/40 transition-colors group"
-              >
-                {/* Contact & Phone */}
-                <td className="py-4 px-4 sm:px-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center flex-shrink-0 border border-[#F5C2C4]">
-                      {name[0]?.toUpperCase() || 'W'}
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm text-[#1A1A1A] dark:text-[#F3F4F6] group-hover:text-[#D92228] transition-colors">
-                        {name}
-                      </p>
-                      <p className="font-mono text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
-                        {phone}
-                      </p>
-                    </div>
+          return (
+            <div key={contact.id} className="p-4 space-y-3 hover:bg-[#F9FAFB] dark:hover:bg-[#202c33]/40 transition-colors">
+              {/* Header row with Avatar, Name, Phone & Messages count */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center flex-shrink-0 border border-[#F5C2C4] shadow-xs">
+                    {name[0]?.toUpperCase() || 'W'}
                   </div>
-                </td>
-
-                {/* First Contact Date */}
-                <td className="py-4 px-4 hidden md:table-cell text-[#6B7280] dark:text-[#9CA3AF]">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#D92228]" />
-                    <span>{formatKarachiDateTime(contact.first_seen_at)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-sm text-[#1A1A1A] dark:text-[#F3F4F6] truncate">
+                      {name}
+                    </p>
+                    <p className="font-mono text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
+                      {phone}
+                    </p>
                   </div>
-                </td>
+                </div>
 
-                {/* Last Activity Date */}
-                <td className="py-4 px-4 text-[#1A1A1A]">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 text-[#6B7280]">
-                      <Clock className="w-3.5 h-3.5 text-[#D92228]" />
-                      <span>{formatKarachiDateTime(contact.last_seen_at)}</span>
-                    </div>
-                    {active ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#16A34A] bg-emerald-50 px-2 py-0.5 rounded-full">
-                        <Flame className="w-3.5 h-3.5 text-[#16A34A]" />
-                        Active Window
-                      </span>
-                    ) : (
-                      <span className="inline-block text-[10px] text-[#6B7280] bg-[#F9FAFB] border border-[#E5E7EB] px-2 py-0.5 rounded-full">
-                        Past 24h
-                      </span>
-                    )}
-                  </div>
-                </td>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#F9FAFB] dark:bg-[#202c33] border border-[#E5E7EB] dark:border-[#26353d] text-[#1A1A1A] dark:text-[#F3F4F6] flex-shrink-0">
+                  <MessageSquare className="w-3.5 h-3.5 text-[#D92228]" />
+                  {contact.message_count}
+                </span>
+              </div>
 
-                {/* Total Messages Count */}
-                <td className="py-4 px-4 text-center">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#F9FAFB] border border-[#E5E7EB] text-[#1A1A1A]">
-                    <MessageSquare className="w-3.5 h-3.5 text-[#D92228]" />
-                    {contact.message_count}
+              {/* Status & Timing metadata */}
+              <div className="flex items-center justify-between text-xs text-[#6B7280] dark:text-[#9CA3AF] pt-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#D92228]" />
+                  <span>{formatKarachiDateTime(contact.last_seen_at)}</span>
+                </div>
+                {active ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#16A34A] bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 px-2 py-0.5 rounded-full">
+                    <Flame className="w-3 h-3 text-[#16A34A]" />
+                    Active Window
                   </span>
-                </td>
+                ) : (
+                  <span className="inline-block text-[10px] text-[#6B7280] bg-[#F9FAFB] dark:bg-[#202c33] border border-[#E5E7EB] dark:border-[#26353d] px-2 py-0.5 rounded-full">
+                    Past 24h
+                  </span>
+                )}
+              </div>
 
-                {/* Action Column with Individual Lead Export CSV, Excel & View Chat Buttons */}
-                <td className="py-4 px-4 sm:px-6 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    {/* Individual CSV Export */}
-                    <button
-                      onClick={() => handleDownloadSingleCsv(contact)}
-                      disabled={downloadingId?.id === contact.id}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-                      title={`Download CSV for ${name}`}
-                    >
-                      {isDownloadingCsv ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              {/* Action Buttons row */}
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => handleDownloadSingleCsv(contact)}
+                  disabled={downloadingId?.id === contact.id}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-blue-600 hover:bg-blue-50 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {isDownloadingCsv ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <FileText className="w-3.5 h-3.5 text-blue-500" />}
+                  <span>CSV</span>
+                </button>
+
+                <button
+                  onClick={() => handleDownloadSingleXlsx(contact)}
+                  disabled={downloadingId?.id === contact.id}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-emerald-700 hover:bg-emerald-50 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {isDownloadingXlsx ? <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" /> : <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />}
+                  <span>XLSX</span>
+                </button>
+
+                <Link
+                  href={`/conversations/${contact.id}`}
+                  className="flex-1 inline-flex items-center justify-center gap-1 py-2 px-3 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs cursor-pointer"
+                >
+                  <span>Chat</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop Table View (>= md screens) */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-[#E5E7EB] dark:border-[#26353d] bg-[#F9FAFB] dark:bg-[#202c33]/40 text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-wider">
+              <th className="py-3.5 px-6">Contact & Phone</th>
+              <th className="py-3.5 px-4">First Contact</th>
+              <th className="py-3.5 px-4">Last Activity</th>
+              <th className="py-3.5 px-4 text-center">Messages</th>
+              <th className="py-3.5 px-6 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#26353d] text-xs">
+            {contacts.map((contact) => {
+              const active = isWithin24Hours(contact.last_seen_at);
+              const name = contact.profile_name || 'WhatsApp User';
+              const phone = formatPhone(contact.wa_id);
+              const isDownloadingCsv = downloadingId?.id === contact.id && downloadingId.type === 'csv';
+              const isDownloadingXlsx = downloadingId?.id === contact.id && downloadingId.type === 'xlsx';
+
+              return (
+                <tr
+                  key={contact.id}
+                  className="hover:bg-[#F9FAFB] dark:hover:bg-[#202c33]/40 transition-colors group"
+                >
+                  {/* Contact & Phone */}
+                  <td className="py-4 px-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-[#FDEBEC] text-[#D92228] font-bold text-sm flex items-center justify-center flex-shrink-0 border border-[#F5C2C4]">
+                        {name[0]?.toUpperCase() || 'W'}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-[#1A1A1A] dark:text-[#F3F4F6] group-hover:text-[#D92228] transition-colors">
+                          {name}
+                        </p>
+                        <p className="font-mono text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
+                          {phone}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* First Contact Date */}
+                  <td className="py-4 px-4 text-[#6B7280] dark:text-[#9CA3AF]">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#D92228]" />
+                      <span>{formatKarachiDateTime(contact.first_seen_at)}</span>
+                    </div>
+                  </td>
+
+                  {/* Last Activity Date */}
+                  <td className="py-4 px-4 text-[#1A1A1A]">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-[#6B7280]">
+                        <Clock className="w-3.5 h-3.5 text-[#D92228]" />
+                        <span>{formatKarachiDateTime(contact.last_seen_at)}</span>
+                      </div>
+                      {active ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#16A34A] bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <Flame className="w-3.5 h-3.5 text-[#16A34A]" />
+                          Active Window
+                        </span>
                       ) : (
-                        <FileText className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="inline-block text-[10px] text-[#6B7280] bg-[#F9FAFB] border border-[#E5E7EB] px-2 py-0.5 rounded-full">
+                          Past 24h
+                        </span>
                       )}
-                      <span>CSV</span>
-                    </button>
+                    </div>
+                  </td>
 
-                    {/* Individual Excel (.xlsx) Export */}
-                    <button
-                      onClick={() => handleDownloadSingleXlsx(contact)}
-                      disabled={downloadingId?.id === contact.id}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-                      title={`Download Excel (.xlsx) for ${name}`}
-                    >
-                      {isDownloadingXlsx ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                      ) : (
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                      )}
-                      <span>XLSX</span>
-                    </button>
+                  {/* Total Messages Count */}
+                  <td className="py-4 px-4 text-center">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#F9FAFB] border border-[#E5E7EB] text-[#1A1A1A]">
+                      <MessageSquare className="w-3.5 h-3.5 text-[#D92228]" />
+                      {contact.message_count}
+                    </span>
+                  </td>
 
-                    {/* View Chat Link */}
-                    <Link
-                      href={`/conversations/${contact.id}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-[#1A1A1A] hover:bg-[#D92228] hover:text-white hover:border-[#D92228] transition-all shadow-xs cursor-pointer"
-                    >
-                      <span>View Chat</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                  {/* Action Column */}
+                  <td className="py-4 px-6 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => handleDownloadSingleCsv(contact)}
+                        disabled={downloadingId?.id === contact.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                        title={`Download CSV for ${name}`}
+                      >
+                        {isDownloadingCsv ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5 text-blue-500" />
+                        )}
+                        <span>CSV</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDownloadSingleXlsx(contact)}
+                        disabled={downloadingId?.id === contact.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                        title={`Download Excel (.xlsx) for ${name}`}
+                      >
+                        {isDownloadingXlsx ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                        ) : (
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                        )}
+                        <span>XLSX</span>
+                      </button>
+
+                      <Link
+                        href={`/conversations/${contact.id}`}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-[#1A1A1A] hover:bg-[#D92228] hover:text-white hover:border-[#D92228] transition-all shadow-xs cursor-pointer"
+                      >
+                        <span>View Chat</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

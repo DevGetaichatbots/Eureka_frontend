@@ -153,11 +153,11 @@ export default function LeadsPage() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handleRefresh}
             disabled={refreshing || loading}
-            className="p-2 rounded-xl text-[#6B7280] hover:text-[#D92228] dark:hover:text-white bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] transition-colors disabled:opacity-50 cursor-pointer"
+            className="p-2.5 rounded-xl text-[#6B7280] hover:text-[#D92228] dark:hover:text-white bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] transition-colors disabled:opacity-50 cursor-pointer flex-shrink-0"
             title="Refresh Leads"
           >
             <RefreshCw className={`w-4 h-4 text-[#D92228] ${refreshing ? 'animate-spin' : ''}`} />
@@ -167,7 +167,7 @@ export default function LeadsPage() {
           <button
             onClick={handleExportCsv}
             disabled={exportingCsv || loading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-[#1A1A1A] dark:text-[#F3F4F6] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-[#1A1A1A] dark:text-[#F3F4F6] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
           >
             {exportingCsv ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D92228]" />
@@ -181,14 +181,14 @@ export default function LeadsPage() {
           <button
             onClick={handleExportXlsx}
             disabled={exportingXlsx || loading}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
           >
             {exportingXlsx ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <FileSpreadsheet className="w-3.5 h-3.5" />
             )}
-            <span>Export Excel (.xlsx)</span>
+            <span>Export Excel</span>
           </button>
         </div>
       </div>
