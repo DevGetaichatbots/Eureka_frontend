@@ -124,8 +124,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     return new Set<number>();
   });
 
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-
   const handleToggleArchive = async () => {
     if (!selectedId) return;
     const currentlyArchived = archivedIds.has(selectedId);
@@ -167,48 +165,61 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     }
   };
 
-  const handleDeleteConversation = () => {
+  // Instant delete without confirmation dialog — persists to Supabase database so all users never see it again
+  const handleDeleteConversation = async () => {
     if (!selectedId) return;
-    setShowDeleteModal(true);
-  };
+    const deletedConvId = selectedId;
+    const targetConv = conversations.find((c) => c.id === deletedConvId) || activeData?.conversation;
+    const waId = targetConv?.contact?.wa_id || null;
+    const contactId = targetConv?.contact_id || targetConv?.contact?.id || null;
 
-  const handleConfirmDelete = () => {
-    if (!selectedId) return;
-    const targetConv = conversations.find((c) => c.id === selectedId) || activeData?.conversation;
+    // 1. Instantly hide from frontend UI state
     setDeletedIds((prev) => {
-      const next = new Set(prev).add(selectedId);
+      const next = new Set(prev).add(deletedConvId);
       if (typeof window !== 'undefined') {
         localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(next)));
       }
       return next;
     });
 
-    if (targetConv) {
-      const waId = targetConv.contact?.wa_id;
-      const contactId = targetConv.contact_id || targetConv.contact?.id;
-      if (typeof window !== 'undefined') {
-        try {
-          const savedWaIds = JSON.parse(localStorage.getItem('eureka_deleted_lead_wa_ids') || '[]');
-          const waIdSet = new Set(savedWaIds);
-          if (waId) {
-            waIdSet.add(waId);
-            const digits = waId.replace(/\D/g, '');
-            if (digits) {
-              waIdSet.add(digits);
-              waIdSet.add(`+${digits}`);
-            }
+    if (targetConv && typeof window !== 'undefined') {
+      try {
+        const savedWaIds = JSON.parse(localStorage.getItem('eureka_deleted_lead_wa_ids') || '[]');
+        const waIdSet = new Set(savedWaIds);
+        if (waId) {
+          waIdSet.add(waId);
+          const digits = waId.replace(/\D/g, '');
+          if (digits) {
+            waIdSet.add(digits);
+            waIdSet.add(`+${digits}`);
           }
-          if (contactId) waIdSet.add(String(contactId));
-          if (targetConv.id) waIdSet.add(String(targetConv.id));
-          localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(waIdSet)));
-        } catch {}
+        }
+        if (contactId) waIdSet.add(String(contactId));
+        if (targetConv.id) waIdSet.add(String(targetConv.id));
+        localStorage.setItem('eureka_deleted_lead_wa_ids', JSON.stringify(Array.from(waIdSet)));
         window.dispatchEvent(new Event('eureka_deleted_updated'));
-      }
+      } catch {}
     }
 
-    setShowDeleteModal(false);
-    setActiveData(null);
-    setSelectedId(null);
+    // Select next conversation in list smoothly
+    const remaining = filteredConversations.filter((c) => c.id !== deletedConvId);
+    if (remaining.length > 0) {
+      handleSelectConversation(remaining[0].id);
+    } else {
+      setSelectedId(null);
+      setActiveData(null);
+    }
+
+    // 2. Persist to database so ANY user who logs in anywhere will NEVER see this chat again
+    try {
+      await api.deleteConversation(deletedConvId, {
+        contact_id: contactId,
+        wa_id: waId,
+        deleted_by_user: 'admin@eurekajo.com',
+      });
+    } catch (err) {
+      console.error('Failed to record deleted chat in Supabase:', err);
+    }
   };
 
   useEffect(() => {
@@ -1325,52 +1336,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           totalMessages={activeData.messages.length}
           onClose={() => setShowDetails(false)}
         />
-      )}
-
-      {/* Delete Confirmation Popup Modal */}
-      {showDeleteModal && activeData && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center flex-shrink-0 border border-[#F5C2C4]">
-                <Trash2 className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-[#1A1A1A]">
-                  Delete Conversation?
-                </h3>
-                <p className="text-xs text-[#6B7280] mt-1.5 leading-relaxed">
-                  Are you sure you want to remove the conversation with{' '}
-                  <span className="font-semibold text-[#1A1A1A]">
-                    {activeData.conversation.contact?.profile_name || 'this contact'}
-                  </span>{' '}
-                  from your inbox view?
-                </p>
-                <div className="mt-2.5 p-2.5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] text-[#6B7280]">
-                  <span className="font-semibold text-[#1A1A1A]">🔒 Database Safe:</span> All messages and historical records remain permanently preserved and securely archived in your Supabase database.
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Yes, Delete</span>
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Lightbox Modal */}

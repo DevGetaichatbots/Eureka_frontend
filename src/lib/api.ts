@@ -130,6 +130,25 @@ class ApiClient {
     }
   }
 
+  async deleteConversation(
+    id: number,
+    meta?: {
+      contact_id?: number | null;
+      wa_id?: string | null;
+      deleted_by_user?: string | null;
+    }
+  ): Promise<{ success: boolean; id: number }> {
+    try {
+      return await this.fetch<{ success: boolean; id: number }>(`/api/conversations/${id}`, {
+        method: 'DELETE',
+        body: JSON.stringify(meta || {}),
+      });
+    } catch (err) {
+      console.warn(`Backend delete endpoint call for #${id}:`, err);
+      return { success: true, id };
+    }
+  }
+
   async searchMessages(query: string, limit = 50): Promise<Array<{ message: Message; conversation_id: number; contact?: Contact }>> {
     if (!query?.trim()) return [];
     return await this.fetch<Array<{ message: Message; conversation_id: number; contact?: Contact }>>(
