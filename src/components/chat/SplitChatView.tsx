@@ -286,6 +286,22 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           });
           return next;
         });
+
+        // If server returns an active conversation (e.g. new WhatsApp message arrived), revive it in UI
+        setDeletedIds((prev) => {
+          let changed = false;
+          const next = new Set(prev);
+          res.items.forEach((conv) => {
+            if (next.has(conv.id)) {
+              next.delete(conv.id);
+              changed = true;
+            }
+          });
+          if (changed && typeof window !== 'undefined') {
+            localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(next)));
+          }
+          return changed ? next : prev;
+        });
       }
 
       // Auto-sync all deleted conversation IDs to their contact phone numbers in localStorage
