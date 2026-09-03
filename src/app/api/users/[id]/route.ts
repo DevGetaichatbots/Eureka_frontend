@@ -48,13 +48,11 @@ export async function DELETE(
     }
 
     const userIndex = MOCK_USERS.findIndex((u) => u.id === userId);
-    if (userIndex === -1) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    if (userIndex !== -1) {
+      MOCK_USERS[userIndex].status = 'deleted' as any;
     }
 
-    MOCK_USERS.splice(userIndex, 1);
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, id: userId });
   } catch (err: unknown) {
     return NextResponse.json(
       { message: err instanceof Error ? err.message : 'Internal Server Error' },
