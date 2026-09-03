@@ -44,6 +44,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Filter,
+  Loader2,
 } from 'lucide-react';
 
 interface SplitChatViewProps {
@@ -840,6 +841,16 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               </button>
             </div>
           </>
+        ) : loadingThread || selectedId ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#F9FAFB]/60">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center border border-[#F5C2C4] shadow-xs">
+                <Loader2 className="w-6 h-6 animate-spin text-[#D92228]" />
+              </div>
+              <p className="text-xs font-semibold text-[#1A1A1A]">Loading conversation thread...</p>
+              <p className="text-[11px] text-[#6B7280]">Fetching customer message history</p>
+            </div>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-[#6B7280] p-6 text-center">
             {mobileView === 'chat' && (
