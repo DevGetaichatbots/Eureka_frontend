@@ -1,0 +1,491 @@
+{
+	"info": {
+		"_postman_id": "d5b7a33a-c896-444c-8872-6c03bf619291",
+		"name": "Chat Bot",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12635609"
+	},
+	"item": [
+		{
+			"name": "RealeStates",
+			"item": [
+				{
+					"name": "Search",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{SiteURL}}/api/Realestates/Search?Category=عمارة&OfferingType=للايجار&Area=طبربور&PageNo=1&PageSize=10",
+							"host": [
+								"{{SiteURL}}"
+							],
+							"path": [
+								"api",
+								"Realestates",
+								"Search"
+							],
+							"query": [
+								{
+									"key": "FloorNumber",
+									"value": "[1,2,3]",
+									"description": "[1,2,3,4] OR 3",
+									"disabled": true
+								},
+								{
+									"key": "minPrice",
+									"value": "50000",
+									"disabled": true
+								},
+								{
+									"key": "maxPrice",
+									"value": "100000",
+									"disabled": true
+								},
+								{
+									"key": "minSize",
+									"value": "140",
+									"disabled": true
+								},
+								{
+									"key": "maxSize",
+									"value": "160",
+									"disabled": true
+								},
+								{
+									"key": "Bedrooms",
+									"value": "[1,2,3,4]",
+									"description": "[1,2,3,4]",
+									"disabled": true
+								},
+								{
+									"key": "AgeBuilding",
+									"value": "[0,1,2,3,4,5]",
+									"description": "[0,1,2,3,4,5]",
+									"disabled": true
+								},
+								{
+									"key": "FurnishedUnFurnished",
+									"value": "true",
+									"description": "333",
+									"disabled": true
+								},
+								{
+									"key": "minSize2",
+									"value": "1",
+									"description": "1",
+									"disabled": true
+								},
+								{
+									"key": "maxSize2",
+									"value": "333",
+									"description": "9999",
+									"disabled": true
+								},
+								{
+									"key": "Pool",
+									"value": "true",
+									"description": "true or false",
+									"disabled": true
+								},
+								{
+									"key": "Roof",
+									"value": "true",
+									"description": "true or false",
+									"disabled": true
+								},
+								{
+									"key": "Category",
+									"value": "عمارة"
+								},
+								{
+									"key": "OfferingType",
+									"value": "للايجار"
+								},
+								{
+									"key": "Area",
+									"value": "طبربور"
+								},
+								{
+									"key": "PageNo",
+									"value": "1"
+								},
+								{
+									"key": "PageSize",
+									"value": "10"
+								},
+								{
+									"key": "Size",
+									"value": "150",
+									"disabled": true
+								},
+								{
+									"key": "Size2",
+									"value": "150",
+									"disabled": true
+								},
+								{
+									"key": "Price",
+									"value": "80000",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetSearchUrl",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{SiteURL}}/api/Realestates/GetSearchUrl?Area=عمان الغربية - غرب عمان&Category=شقة&OfferingType=للبيع",
+							"host": [
+								"{{SiteURL}}"
+							],
+							"path": [
+								"api",
+								"Realestates",
+								"GetSearchUrl"
+							],
+							"query": [
+								{
+									"key": "Area",
+									"value": "عمان الغربية - غرب عمان"
+								},
+								{
+									"key": "Category",
+									"value": "شقة"
+								},
+								{
+									"key": "OfferingType",
+									"value": "للبيع"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{SiteURL}}/api/Realestates/GetSearchUrl?Area=عمان-الغربية-غرب-عمان&Category=شقة&OfferingType=للبيع",
+									"host": [
+										"{{SiteURL}}"
+									],
+									"path": [
+										"api",
+										"Realestates",
+										"GetSearchUrl"
+									],
+									"query": [
+										{
+											"key": "Area",
+											"value": "عمان-الغربية-غرب-عمان"
+										},
+										{
+											"key": "Category",
+											"value": "شقة"
+										},
+										{
+											"key": "OfferingType",
+											"value": "للبيع"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Cache-Control",
+									"value": "no-cache"
+								},
+								{
+									"key": "Pragma",
+									"value": "no-cache"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Expires",
+									"value": "-1"
+								},
+								{
+									"key": "Server",
+									"value": "Microsoft-IIS/10.0"
+								},
+								{
+									"key": "X-AspNet-Version",
+									"value": "4.0.30319"
+								},
+								{
+									"key": "X-Powered-By",
+									"value": "ASP.NET"
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 27 Mar 2025 18:21:15 GMT"
+								},
+								{
+									"key": "Content-Length",
+									"value": "128"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"$id\": \"1\",\n    \"SearchUrl\": \"http://site.realestate.dv/Realestates/Search/عمان-الغربية-غرب-عمان/شقة/للبيع\",\n    \"SearchUrlEncoded\": \"http://site.realestate.dv/Realestates/Search/%D8%B9%D9%85%D8%A7%D9%86-%D8%A7%D9%84%D8%BA%D8%B1%D8%A8%D9%8A%D8%A9-%D8%BA%D8%B1%D8%A8-%D8%B9%D9%85%D8%A7%D9%86/%D8%B4%D9%82%D8%A9/%D9%84%D9%84%D8%A8%D9%8A%D8%B9\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "LookUps",
+			"item": [
+				{
+					"name": "Get Categories",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer bm2MpAobsDau-86eyyvpyOt41SbgXNCOTkuexUJCjQDnt0Zy7o2HDLd8qX7sAG4BUKeYWxjtZge_Im7sbprDzsdLmAzywvdl2diEyznnJRvkdezFacYYDvJxwSY9C5bMC1XbRinQCpjtZXwuzgXmqU88lZJ5bivycwqT9mTr4cxz043xfkBD7WcawaxZ35n1HhvrG_UR2wqPA5O3tjdqbd1g-YMGz0-k1zB4Sh10gkoIKtv8eVlwpl81bTT7UwhjwEDcns1HYpNX9W0XifU49-AnM9hLvxpRvj8wrC43tDfkqyF2MOtpcS_wq1zC1LHG02nJ21h2LkaPMK8lFTha0yrc5ZI19EsLmqWf6yfT6wTP2Ip5rbTk1cyrzzWOwGUPtDe2Y5MUUg1W42gVCF_CjLq3GBzm5hlO_mRt2MTChD5Fstj6DlmUCngLsbd9HK5iW5ROY0uMRED7H5b1na3bNZ2tvi_-NJi3rAlie8EiJIDwfNgBAxg-egAY7IJP6Fh0nayQ4MW3UKx_EztMSTvFrFiLRDUYQFTwXyBxp0nSv0d1A4lqFBqBjxGiZQZdVJVuBearer ",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{SiteURL}}/api/LookUps/Categories",
+							"host": [
+								"{{SiteURL}}"
+							],
+							"path": [
+								"api",
+								"LookUps",
+								"Categories"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Offering Types",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer bm2MpAobsDau-86eyyvpyOt41SbgXNCOTkuexUJCjQDnt0Zy7o2HDLd8qX7sAG4BUKeYWxjtZge_Im7sbprDzsdLmAzywvdl2diEyznnJRvkdezFacYYDvJxwSY9C5bMC1XbRinQCpjtZXwuzgXmqU88lZJ5bivycwqT9mTr4cxz043xfkBD7WcawaxZ35n1HhvrG_UR2wqPA5O3tjdqbd1g-YMGz0-k1zB4Sh10gkoIKtv8eVlwpl81bTT7UwhjwEDcns1HYpNX9W0XifU49-AnM9hLvxpRvj8wrC43tDfkqyF2MOtpcS_wq1zC1LHG02nJ21h2LkaPMK8lFTha0yrc5ZI19EsLmqWf6yfT6wTP2Ip5rbTk1cyrzzWOwGUPtDe2Y5MUUg1W42gVCF_CjLq3GBzm5hlO_mRt2MTChD5Fstj6DlmUCngLsbd9HK5iW5ROY0uMRED7H5b1na3bNZ2tvi_-NJi3rAlie8EiJIDwfNgBAxg-egAY7IJP6Fh0nayQ4MW3UKx_EztMSTvFrFiLRDUYQFTwXyBxp0nSv0d1A4lqFBqBjxGiZQZdVJVuBearer ",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{SiteURL}}/api/LookUps/OfferingTypes",
+							"host": [
+								"{{SiteURL}}"
+							],
+							"path": [
+								"api",
+								"LookUps",
+								"OfferingTypes"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Areas",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer bm2MpAobsDau-86eyyvpyOt41SbgXNCOTkuexUJCjQDnt0Zy7o2HDLd8qX7sAG4BUKeYWxjtZge_Im7sbprDzsdLmAzywvdl2diEyznnJRvkdezFacYYDvJxwSY9C5bMC1XbRinQCpjtZXwuzgXmqU88lZJ5bivycwqT9mTr4cxz043xfkBD7WcawaxZ35n1HhvrG_UR2wqPA5O3tjdqbd1g-YMGz0-k1zB4Sh10gkoIKtv8eVlwpl81bTT7UwhjwEDcns1HYpNX9W0XifU49-AnM9hLvxpRvj8wrC43tDfkqyF2MOtpcS_wq1zC1LHG02nJ21h2LkaPMK8lFTha0yrc5ZI19EsLmqWf6yfT6wTP2Ip5rbTk1cyrzzWOwGUPtDe2Y5MUUg1W42gVCF_CjLq3GBzm5hlO_mRt2MTChD5Fstj6DlmUCngLsbd9HK5iW5ROY0uMRED7H5b1na3bNZ2tvi_-NJi3rAlie8EiJIDwfNgBAxg-egAY7IJP6Fh0nayQ4MW3UKx_EztMSTvFrFiLRDUYQFTwXyBxp0nSv0d1A4lqFBqBjxGiZQZdVJVuBearer ",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{SiteURL}}/api/LookUps/Areas",
+							"host": [
+								"{{SiteURL}}"
+							],
+							"path": [
+								"api",
+								"LookUps",
+								"Areas"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Areas",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{SiteURL}}/api/LookUps/SearchAreas?area=عمان-الغربية-غرب-عمان",
+							"host": [
+								"{{SiteURL}}"
+							],
+							"path": [
+								"api",
+								"LookUps",
+								"SearchAreas"
+							],
+							"query": [
+								{
+									"key": "area",
+									"value": "عمان-الغربية-غرب-عمان"
+								},
+								{
+									"key": "country",
+									"value": "JO",
+									"disabled": true
+								},
+								{
+									"key": "lang",
+									"value": "en",
+									"disabled": true
+								},
+								{
+									"key": "maxResults",
+									"value": "10",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{SiteURL}}/api/LookUps/SearchGoogleAreas?q=مخيم البقعة",
+									"host": [
+										"{{SiteURL}}"
+									],
+									"path": [
+										"api",
+										"LookUps",
+										"SearchGoogleAreas"
+									],
+									"query": [
+										{
+											"key": "q",
+											"value": "مخيم البقعة"
+										},
+										{
+											"key": "lang",
+											"value": "en",
+											"disabled": true
+										},
+										{
+											"key": "country",
+											"value": "JO",
+											"disabled": true
+										},
+										{
+											"key": "maxResults",
+											"value": "10",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [
+								{
+									"key": "Cache-Control",
+									"value": "no-cache"
+								},
+								{
+									"key": "Pragma",
+									"value": "no-cache"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Expires",
+									"value": "-1"
+								},
+								{
+									"key": "Server",
+									"value": "Microsoft-IIS/10.0"
+								},
+								{
+									"key": "X-AspNet-Version",
+									"value": "4.0.30319"
+								},
+								{
+									"key": "X-Powered-By",
+									"value": "ASP.NET"
+								},
+								{
+									"key": "Date",
+									"value": "Tue, 16 Sep 2025 20:59:31 GMT"
+								},
+								{
+									"key": "Content-Length",
+									"value": "284"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"$id\": \"1\",\n        \"Name\": \"مخيم البقعه\",\n        \"Lat\": 32.0675339,\n        \"Lng\": 35.8395126\n    },\n    {\n        \"$id\": \"2\",\n        \"Name\": \"مخيم البقعة شارع العريض\",\n        \"Lat\": 32.0759929,\n        \"Lng\": 35.838551\n    },\n    {\n        \"$id\": \"3\",\n        \"Name\": \"مخيم البقعةقرب مود بناء شلال\",\n        \"Lat\": 32.0782901,\n        \"Lng\": 35.8508429\n    }\n]"
+						}
+					]
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "SiteURL",
+			"value": "",
+			"type": "default"
+		}
+	]
+}

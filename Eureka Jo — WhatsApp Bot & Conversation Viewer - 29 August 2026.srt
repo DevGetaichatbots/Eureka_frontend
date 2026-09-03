@@ -1,0 +1,103 @@
+1
+00:00:00,011 --> 00:00:02,575
+Hi there,
+
+2
+00:00:02,627 --> 00:00:05,852
+first of all, I will, first of all today,
+
+3
+00:00:05,853 --> 00:00:08,986
+I will make a backend for, uh, uh, for my,
+
+4
+00:00:08,987 --> 00:00:13,847
+uh, for my Roka web project
+
+5
+00:00:13,848 --> 00:00:16,053
+where I will make APIs for it.
+
+6
+00:00:16,054 --> 00:00:20,019
+Uh, uh, where I will make APIs for my,
+
+7
+00:00:20,020 --> 00:00:22,646
+uh, WhatsApp bot project,
+
+8
+00:00:22,966 --> 00:00:27,081
+Roka WhatsApp bot project. I will make a login,
+
+9
+00:00:27,082 --> 00:00:29,261
+sign up, and,
+
+10
+00:00:29,262 --> 00:00:32,096
+uh, sorry, I will make a login API.
+
+11
+00:00:32,097 --> 00:00:34,457
+Then I will make a conversation,
+
+12
+00:00:34,458 --> 00:00:37,021
+errors, tunnels, leads, .py,
+
+13
+00:00:37,022 --> 00:00:39,334
+then I will connect, uh,
+
+14
+00:00:39,345 --> 00:00:43,235
+any 10 webhooks, then I will also set up the,
+
+15
+00:00:43,236 --> 00:00:46,594
+uh, then I will also set up the Roka,
+
+16
+00:00:47,360 --> 00:00:49,647
+Superbase, You Through Credentials,
+
+17
+00:00:49,648 --> 00:00:54,177
+where I will make tables for, I will also connect the Superbase
+
+18
+00:00:54,178 --> 00:00:58,329
+and integrate it, and I will make tables like Users,
+
+19
+00:00:58,330 --> 00:01:00,918
+Contacts, Conversations, Error Logs,
+
+20
+00:01:01,550 --> 00:01:04,187
+and Messages, these are the tables.
+
+21
+00:01:04,188 --> 00:01:06,303
+I will make, then I, then,
+
+22
+00:01:06,304 --> 00:01:10,556
+this is, uhm, the login page for Eroka Web Project,
+
+23
+00:01:11,409 --> 00:01:15,374
+then I will make a JWT authentication in that,
+
+24
+00:01:15,822 --> 00:01:22,398
+then I sign in, and log in, then I sign
+
+25
+00:01:22,399 --> 00:01:27,039
+in, and log
+
+26
+00:01:27,040 --> 00:01:27,491
+in,
