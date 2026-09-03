@@ -47,6 +47,7 @@ import {
   Filter,
   Archive,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 
 interface SplitChatViewProps {
@@ -87,6 +88,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [loadingThread, setLoadingThread] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [refreshingThread, setRefreshingThread] = useState(false);
+
+  const loadingConversation = useMemo(() => {
+    return conversations.find((c) => c.id === selectedId);
+  }, [conversations, selectedId]);
+
   const [messageRange, setMessageRange] = useState<'all' | 'today' | 'yesterday' | '3' | '7' | '30' | 'custom'>('all');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -1174,7 +1180,70 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
               </button>
             </div>
           </>
+        ) : selectedId || loadingThread ? (
+          /* Loading Skeleton View for Selected Conversation */
+          <div className="flex-1 flex flex-col h-full bg-[#FAFAFA] animate-in fade-in duration-150">
+            {/* Top Contact Header Bar Skeleton */}
+            <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#E5E7EB] bg-white shadow-xs z-10 flex-shrink-0">
+              <div className="flex items-center justify-between gap-2 sm:gap-4">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  {mobileView === 'chat' && (
+                    <button
+                      type="button"
+                      onClick={() => setMobileView('list')}
+                      className="p-1.5 -ml-1 rounded-xl text-[#1A1A1A] hover:bg-[#FDEBEC] hover:text-[#D92228] transition-colors md:hidden cursor-pointer flex-shrink-0"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                  )}
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-xs sm:text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
+                    {loadingConversation?.contact?.profile_name?.[0]?.toUpperCase() || 'W'}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-xs sm:text-sm font-bold text-[#1A1A1A] truncate">
+                      {loadingConversation?.contact?.profile_name || 'Loading Conversation...'}
+                    </h2>
+                    <p className="text-[10px] text-[#6B7280] font-mono truncate">
+                      {loadingConversation?.contact?.wa_id ? `+${loadingConversation.contact.wa_id}` : 'Connecting...'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FDEBEC] text-[#D92228] text-xs font-semibold border border-[#F5C2C4]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D92228]" />
+                    <span className="hidden sm:inline">Loading chat...</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Chat Body Loader & Shimmer Bubbles */}
+            <div className="flex-1 p-4 sm:p-6 flex flex-col justify-center items-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center border border-[#F5C2C4] shadow-xs">
+                <Loader2 className="w-6 h-6 animate-spin text-[#D92228]" />
+              </div>
+              <div className="text-center space-y-1">
+                <h4 className="text-sm font-bold text-[#1A1A1A]">Loading Conversation...</h4>
+                <p className="text-xs text-[#6B7280]">Fetching messages from WhatsApp Cloud API</p>
+              </div>
+
+              {/* Decorative Shimmer Bubbles */}
+              <div className="w-full max-w-md space-y-3 pt-2 opacity-60 pointer-events-none">
+                <div className="flex justify-start">
+                  <div className="w-48 sm:w-60 h-10 rounded-2xl rounded-tl-xs bg-gray-200 animate-pulse" />
+                </div>
+                <div className="flex justify-end">
+                  <div className="w-56 sm:w-68 h-12 rounded-2xl rounded-tr-xs bg-[#F5C2C4]/40 animate-pulse" />
+                </div>
+                <div className="flex justify-start">
+                  <div className="w-40 sm:w-52 h-9 rounded-2xl rounded-tl-xs bg-gray-200 animate-pulse" />
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
+          /* Empty State when no conversation is selected */
           <div className="flex-1 flex flex-col items-center justify-center text-[#6B7280] p-6 text-center">
             {mobileView === 'chat' && (
               <button
