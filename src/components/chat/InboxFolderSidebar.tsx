@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   Tag,
   Building,
+  Archive,
 } from 'lucide-react';
 
 interface InboxFolderSidebarProps {
@@ -26,6 +27,7 @@ interface InboxFolderSidebarProps {
     bot: number;
     unassigned: number;
     reminders: number;
+    archived?: number;
   };
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -164,6 +166,30 @@ export function InboxFolderSidebar({
             </div>
             <span className="text-[11px] text-[#6B7280]">
               {counts.reminders}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectFolder('archived')}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              selectedFolder === 'archived'
+                ? 'bg-[#FDEBEC] text-[#D92228] font-bold shadow-xs'
+                : 'text-[#1A1A1A] hover:bg-[#F9FAFB]'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Archive className="w-4 h-4 text-[#D92228]" />
+              <span>Archived</span>
+            </div>
+            <span
+              className={`text-[11px] px-1.5 py-0.2 rounded-md ${
+                selectedFolder === 'archived'
+                  ? 'bg-white text-[#D92228] font-bold'
+                  : 'text-[#6B7280]'
+              }`}
+            >
+              {counts.archived || 0}
             </span>
           </button>
         </div>

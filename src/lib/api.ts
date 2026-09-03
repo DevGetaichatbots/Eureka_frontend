@@ -104,6 +104,13 @@ class ApiClient {
     return await this.fetch<{ conversation: Conversation; messages: Message[] }>(`/api/conversations/${id}`);
   }
 
+  async archiveConversation(id: number, isArchived = true): Promise<{ success: boolean; is_archived: boolean }> {
+    return await this.fetch<{ success: boolean; is_archived: boolean }>(`/api/conversations/${id}/archive`, {
+      method: 'POST',
+      body: JSON.stringify({ is_archived: isArchived }),
+    });
+  }
+
   async searchMessages(query: string, limit = 50): Promise<Array<{ message: Message; conversation_id: number; contact?: Contact }>> {
     if (!query?.trim()) return [];
     return await this.fetch<Array<{ message: Message; conversation_id: number; contact?: Contact }>>(

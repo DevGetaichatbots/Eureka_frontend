@@ -43,6 +43,8 @@ export interface Conversation {
   last_message_at: string;
   message_count: number;
   last_message?: Message;
+  is_archived?: boolean;
+  archived_at?: string | null;
 }
 
 export interface SearchResultItem extends Conversation {

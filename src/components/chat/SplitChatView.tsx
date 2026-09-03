@@ -126,20 +126,31 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const handleToggleArchive = () => {
+  const handleToggleArchive = async () => {
     if (!selectedId) return;
+    const currentlyArchived = archivedIds.has(selectedId);
+    const newArchivedState = !currentlyArchived;
+
+    // 1. Optimistic UI update immediately
     setArchivedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(selectedId)) {
-        next.delete(selectedId);
-      } else {
+      if (newArchivedState) {
         next.add(selectedId);
+      } else {
+        next.delete(selectedId);
       }
       if (typeof window !== 'undefined') {
         localStorage.setItem('eureka_archived_chats', JSON.stringify(Array.from(next)));
       }
       return next;
     });
+
+    // 2. Persist to database
+    try {
+      await api.archiveConversation(selectedId, newArchivedState);
+    } catch (err) {
+      console.error('Failed to persist archive status to Supabase:', err);
+    }
   };
 
   const handleDeleteConversation = () => {
@@ -221,6 +232,19 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       setListError(null);
 
       setSelectedId((prev) => (prev ? prev : (res.items.length > 0 ? res.items[0].id : null)));
+
+      // Sync archived IDs from database
+      if (res.items?.length) {
+        setArchivedIds((prev) => {
+          const next = new Set(prev);
+          res.items.forEach((conv) => {
+            if (conv.is_archived) {
+              next.add(conv.id);
+            }
+          });
+          return next;
+        });
+      }
 
       // Auto-sync all deleted conversation IDs to their contact phone numbers in localStorage
       if (typeof window !== 'undefined' && res.items?.length) {
@@ -522,16 +546,20 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   // Counts for folders
   const folderCounts = useMemo(() => {
-    const total = conversations.length;
-    const active = conversations.filter((c) => isWithin24Hours(c.last_message_at)).length;
+    const nonDeleted = conversations.filter((c) => !deletedIds.has(c.id));
+    const archivedCount = nonDeleted.filter((c) => archivedIds.has(c.id)).length;
+    const nonArchived = nonDeleted.filter((c) => !archivedIds.has(c.id));
+    const total = nonArchived.length;
+    const active = nonArchived.filter((c) => isWithin24Hours(c.last_message_at)).length;
     return {
       all: total,
       active,
       bot: total,
       unassigned: 0,
       reminders: 1,
+      archived: archivedCount,
     };
-  }, [conversations]);
+  }, [conversations, archivedIds, deletedIds]);
 
   // Filtered & Sorted conversations list
   const filteredConversations = useMemo(() => {
@@ -540,7 +568,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         if (deletedIds.has(conv.id)) return false;
 
         const isArchived = archivedIds.has(conv.id);
-        if (chatFilter === 'archived') {
+        if (selectedFolder === 'archived' || chatFilter === 'archived') {
           if (!isArchived) return false;
         } else {
           if (isArchived) return false;
@@ -708,9 +736,19 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
             </div>
           ) : filteredConversations.length === 0 ? (
             <div className="p-8 text-center text-[#6B7280]">
-              <MessageSquare className="w-8 h-8 mx-auto text-[#9CA3AF] mb-2 opacity-60" />
-              <p className="text-xs font-semibold text-[#1A1A1A]">No conversations found</p>
-              <p className="text-[11px] text-[#6B7280] mt-1">Try resetting your filters</p>
+              {selectedFolder === 'archived' || chatFilter === 'archived' ? (
+                <>
+                  <Archive className="w-8 h-8 mx-auto text-[#D92228] mb-2 opacity-70" />
+                  <p className="text-xs font-semibold text-[#1A1A1A]">No archived chats</p>
+                  <p className="text-[11px] text-[#6B7280] mt-1">Archived conversations will appear here</p>
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="w-8 h-8 mx-auto text-[#9CA3AF] mb-2 opacity-60" />
+                  <p className="text-xs font-semibold text-[#1A1A1A]">No conversations found</p>
+                  <p className="text-[11px] text-[#6B7280] mt-1">Try resetting your filters</p>
+                </>
+              )}
             </div>
           ) : (
             (() => {
