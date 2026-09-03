@@ -29,8 +29,9 @@ export default function LoginPage() {
         return;
       }
       setError(res.message || 'Invalid email or password.');
-    } catch {
-      setError('An unexpected error occurred. Please try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
