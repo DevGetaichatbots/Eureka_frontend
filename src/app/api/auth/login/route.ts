@@ -15,6 +15,13 @@ export async function POST(request: Request) {
 
     // Check mock credentials or accept admin@company.com with password123
     const user = MOCK_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+
+    if (user && user.status === 'disabled') {
+      return NextResponse.json(
+        { success: false, message: 'Your account is disabled. Please contact an administrator.' },
+        { status: 403 }
+      );
+    }
     
     // Allow login for mock user or fallback mock admin
     if ((user && password === 'password123') || (email === 'admin@company.com' && password === 'password123')) {

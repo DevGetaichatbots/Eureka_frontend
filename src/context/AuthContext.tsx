@@ -24,6 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function checkSession() {
       try {
         const currentUser = await api.getCurrentUser();
+        if (currentUser?.status === 'disabled') {
+          await api.logout();
+          setUser(null);
+          if (!pathname.startsWith('/login')) {
+            router.push('/login');
+          }
+          return;
+        }
         setUser(currentUser);
         if (!currentUser && !pathname.startsWith('/login')) {
           router.push('/login');
@@ -44,6 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api.login(credentials);
       if (res.user) {
+        if (res.user.status === 'disabled') {
+          await api.logout();
+          return {
+            success: false,
+            message: 'Your account is disabled. Please contact an administrator.',
+          };
+        }
         setUser(res.user);
         router.push('/conversations');
         return { success: true };
