@@ -68,7 +68,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
-  const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed'>('open');
+  const [chatFilter, setChatFilter] = useState<'open' | 'active24h' | 'closed' | 'archived'>('open');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedId, setSelectedId] = useState<number | null>(urlId || null);
@@ -96,9 +96,26 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Archive & Delete states
-  const [archivedIds, setArchivedIds] = useState<Set<number>>(new Set());
-  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
+  // Archive & Delete states with localStorage persistence
+  const [archivedIds, setArchivedIds] = useState<Set<number>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('eureka_archived_chats');
+        if (saved) return new Set<number>(JSON.parse(saved));
+      } catch {}
+    }
+    return new Set<number>();
+  });
+
+  const [deletedIds, setDeletedIds] = useState<Set<number>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('eureka_deleted_chats');
+        if (saved) return new Set<number>(JSON.parse(saved));
+      } catch {}
+    }
+    return new Set<number>();
+  });
 
   const handleToggleArchive = () => {
     if (!selectedId) return;
@@ -109,6 +126,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       } else {
         next.add(selectedId);
       }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('eureka_archived_chats', JSON.stringify(Array.from(next)));
+      }
       return next;
     });
   };
@@ -116,7 +136,13 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const handleDeleteConversation = () => {
     if (!selectedId) return;
     if (window.confirm('Are you sure you want to delete this conversation from your inbox view?')) {
-      setDeletedIds((prev) => new Set(prev).add(selectedId));
+      setDeletedIds((prev) => {
+        const next = new Set(prev).add(selectedId);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('eureka_deleted_chats', JSON.stringify(Array.from(next)));
+        }
+        return next;
+      });
       setActiveData(null);
       setSelectedId(null);
     }
@@ -414,6 +440,13 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       .filter((conv) => {
         if (deletedIds.has(conv.id)) return false;
 
+        const isArchived = archivedIds.has(conv.id);
+        if (chatFilter === 'archived') {
+          if (!isArchived) return false;
+        } else {
+          if (isArchived) return false;
+        }
+
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const name = (conv.contact?.profile_name || '').toLowerCase();
@@ -458,7 +491,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       seen.add(key);
       return true;
     });
-  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder]);
+  }, [conversations, searchQuery, selectedFolder, chatFilter, sortOrder, archivedIds, deletedIds]);
 
   // Select a conversation — state-driven, no URL navigation to avoid re-render conflicts
   const handleSelectConversation = (id: number) => {
@@ -500,6 +533,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 <option value="open">💬 Open Chats</option>
                 <option value="active24h">🔥 Active 24h</option>
                 <option value="closed">⏱ Closed</option>
+                <option value="archived">📦 Archived ({archivedIds.size})</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
