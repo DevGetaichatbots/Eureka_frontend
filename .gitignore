@@ -42,7 +42,16 @@ coverage/
 *.pem
 Thumbs.db
 *.tsbuildinfo
-.agents/
+# Backend & Local Configs
+backend/
 frontend/
+.agents/
+*.pdf
+*.srt
+*.postman_collection.json
+EurekaJO Chatbot*.json
+IMPLEMENTATION_SUMMARY.md
+PROJECT_DEPLOYMENT_SUMMARY.md
+PROJECT_DOCUMENTATION.md
 
 
