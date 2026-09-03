@@ -92,6 +92,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [customEnd, setCustomEnd] = useState('');
 
   // In-conversation message search state
+  const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [inChatSearch, setInChatSearch] = useState('');
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -274,6 +275,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     setMessageRange('all');
     setCustomStart('');
     setCustomEnd('');
+    setShowInChatSearch(false);
     setInChatSearch('');
     setActiveMatchIndex(0);
 
@@ -447,10 +449,25 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         handleNextMatch();
       }
     } else if (e.key === 'Escape') {
+      e.preventDefault();
       setInChatSearch('');
       setActiveMatchIndex(0);
+      setShowInChatSearch(false);
     }
   };
+
+  // Global shortcut to trigger search (Ctrl+F or Cmd+F)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && activeData) {
+        e.preventDefault();
+        setShowInChatSearch(true);
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [activeData]);
 
   // When search query is entered and matches change, auto-jump to the first match
   useEffect(() => {
@@ -808,58 +825,39 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           <>
             {/* Top Contact Header Bar matching reference screenshot */}
             <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#E5E7EB] bg-white shadow-xs z-10 flex-shrink-0 space-y-2">
-              <div className="flex items-center justify-between gap-1.5 sm:gap-3 min-w-0">
-                {/* Left: Avatar & Contact Info */}
-                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-shrink max-w-[120px] sm:max-w-[160px] md:max-w-[200px] lg:max-w-xs">
-                  {/* Mobile Back Button */}
+              {showInChatSearch || inChatSearch.trim() ? (
+                /* Dedicated Full-Width In-Conversation Search Header */
+                <div className="flex items-center gap-2 w-full min-w-0">
                   <button
                     type="button"
-                    onClick={() => setMobileView('list')}
-                    className="p-1.5 -ml-1 rounded-xl text-[#1A1A1A] hover:bg-[#FDEBEC] hover:text-[#D92228] transition-colors md:hidden cursor-pointer flex-shrink-0"
-                    title="Back to conversations list"
+                    onClick={() => {
+                      setShowInChatSearch(false);
+                      setInChatSearch('');
+                      setActiveMatchIndex(0);
+                    }}
+                    className="p-1.5 rounded-xl text-[#6B7280] hover:text-[#D92228] hover:bg-[#FDEBEC] transition-colors cursor-pointer flex-shrink-0"
+                    title="Close search (Esc)"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </button>
 
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-xs sm:text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
-                    {activeData.conversation.contact?.profile_name?.[0]?.toUpperCase() || 'W'}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-xs sm:text-sm font-bold text-[#1A1A1A] truncate" title={activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}>
-                      {activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}
-                    </h2>
-                    <p className="text-[10px] text-[#6B7280] font-mono sm:hidden truncate">
-                      +{activeData.conversation.contact?.wa_id}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Center: In-Conversation Search Bar (Directly where user circled in red) */}
-                <div className="flex-1 min-w-[140px] sm:min-w-[180px] max-w-xs md:max-w-sm lg:max-w-md mx-1 sm:mx-2">
-                  <div className="relative flex items-center w-full">
-                    <Search className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 pointer-events-none flex-shrink-0" />
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex-shrink-0" />
                     <input
                       ref={searchInputRef}
                       type="text"
+                      autoFocus
                       value={inChatSearch}
                       onChange={(e) => setInChatSearch(e.target.value)}
                       onKeyDown={handleSearchKeyDown}
-                      placeholder="Search chat..."
-                      className={`w-full pl-7.5 sm:pl-8 ${
-                        inChatSearch.trim() ? 'pr-20 sm:pr-24' : 'pr-3'
-                      } py-1.5 rounded-xl border text-xs text-[#1A1A1A] placeholder-[#9CA3AF] focus:outline-none transition-all ${
-                        inChatSearch.trim()
-                          ? 'border-[#D92228] bg-white ring-1 ring-[#D92228]/20 shadow-xs'
-                          : 'border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white focus:bg-white focus:border-[#D92228]'
-                      }`}
+                      placeholder={`Search in chat (${activeData.conversation.contact?.profile_name || 'contact'})...`}
+                      className="w-full pl-9 pr-28 sm:pr-36 py-1.5 sm:py-2 rounded-xl border border-[#D92228] bg-white ring-1 ring-[#D92228]/20 shadow-xs text-xs sm:text-sm text-[#1A1A1A] placeholder-[#9CA3AF] focus:outline-none"
                     />
 
-                    {/* Controls inside the search input */}
-                    {inChatSearch.trim() && (
-                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white/95 rounded-r-xl pl-1">
-                        {/* Match counter badge */}
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {inChatSearch.trim() && (
                         <span
-                          className={`text-[10px] font-semibold px-1 sm:px-1.5 py-0.5 rounded-md whitespace-nowrap flex-shrink-0 ${
+                          className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-md whitespace-nowrap ${
                             matchingMessageIds.length > 0
                               ? 'bg-[#FDEBEC] text-[#D92228]'
                               : 'bg-gray-100 text-[#6B7280]'
@@ -867,139 +865,180 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                         >
                           {matchingMessageIds.length > 0
                             ? `${activeMatchIndex + 1}/${matchingMessageIds.length}`
-                            : '0'}
+                            : '0 found'}
                         </span>
+                      )}
 
-                        {/* Prev match button */}
-                        <button
-                          type="button"
-                          onClick={handlePrevMatch}
-                          disabled={matchingMessageIds.length <= 1}
-                          className="p-0.5 sm:p-1 rounded text-[#6B7280] hover:text-[#1A1A1A] hover:bg-gray-100 disabled:opacity-30 cursor-pointer flex-shrink-0"
-                          title="Previous match (Shift+Enter)"
-                        >
-                          <ChevronUp className="w-3 h-3" />
-                        </button>
+                      {matchingMessageIds.length > 1 && (
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={handlePrevMatch}
+                            className="p-1 rounded-lg text-[#6B7280] hover:text-[#1A1A1A] hover:bg-gray-100 cursor-pointer"
+                            title="Previous match (Shift+Enter)"
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleNextMatch}
+                            className="p-1 rounded-lg text-[#6B7280] hover:text-[#1A1A1A] hover:bg-gray-100 cursor-pointer"
+                            title="Next match (Enter)"
+                          >
+                            <ChevronDown className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
 
-                        {/* Next match button */}
-                        <button
-                          type="button"
-                          onClick={handleNextMatch}
-                          disabled={matchingMessageIds.length <= 1}
-                          className="p-0.5 sm:p-1 rounded text-[#6B7280] hover:text-[#1A1A1A] hover:bg-gray-100 disabled:opacity-30 cursor-pointer flex-shrink-0"
-                          title="Next match (Enter)"
-                        >
-                          <ChevronDown className="w-3 h-3" />
-                        </button>
-
-                        {/* Clear search */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInChatSearch('');
-                            setActiveMatchIndex(0);
-                          }}
-                          className="p-0.5 sm:p-1 rounded text-[#9CA3AF] hover:text-[#D92228] hover:bg-[#FDEBEC] cursor-pointer flex-shrink-0"
-                          title="Clear search (Esc)"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInChatSearch('');
+                          setActiveMatchIndex(0);
+                          setShowInChatSearch(false);
+                        }}
+                        className="p-1 rounded-lg text-[#9CA3AF] hover:text-[#D92228] hover:bg-[#FDEBEC] cursor-pointer"
+                        title="Clear & close search (Esc)"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Right: Actions (Reload, Archive, Delete, Message Range, CRM Drawer) */}
-                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleRefreshThread}
-                    disabled={refreshingThread}
-                    className="inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer disabled:opacity-60"
-                    title="Reload latest WhatsApp messages"
-                  >
-                    <RefreshCw
-                      className={`w-3.5 h-3.5 text-[#D92228] flex-shrink-0 ${
-                        refreshingThread ? 'animate-spin' : ''
-                      }`}
-                    />
-                    <span className="hidden xl:inline">{refreshingThread ? 'Reloading' : 'Reload'}</span>
-                  </button>
-
-                  {/* Archive Button */}
-                  <button
-                    type="button"
-                    onClick={handleToggleArchive}
-                    className={`inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-                      activeData && archivedIds.has(activeData.conversation.id)
-                        ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
-                        : 'border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4]'
-                    }`}
-                    title={activeData && archivedIds.has(activeData.conversation.id) ? 'Unarchive conversation' : 'Archive conversation'}
-                  >
-                    <Archive className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
-                    <span className="hidden xl:inline">
-                      {activeData && archivedIds.has(activeData.conversation.id) ? 'Archived' : 'Archive'}
-                    </span>
-                  </button>
-
-                  {/* Delete Button */}
-                  <button
-                    type="button"
-                    onClick={handleDeleteConversation}
-                    className="inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
-                    title="Delete conversation from inbox"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
-                    <span className="hidden xl:inline">Delete</span>
-                  </button>
-
-                  <select
-                    value={messageRange}
-                    onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
-                    className={`pl-2 pr-1 sm:pl-2.5 sm:pr-2 py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer transition-colors max-w-[85px] sm:max-w-[110px] xl:max-w-none truncate ${
-                      messageRange !== 'all'
-                        ? 'border-[#D92228] bg-[#FDEBEC] text-[#D92228]'
-                        : 'border-[#E5E7EB] bg-white text-[#1A1A1A]'
-                    }`}
-                    title="Filter messages by date"
-                  >
-                    <option value="all">All messages</option>
-                    <option value="today">Today</option>
-                    <option value="yesterday">Yesterday</option>
-                    <option value="3">Last 3 days</option>
-                    <option value="7">Last 7 days</option>
-                    <option value="30">Last 30 days</option>
-                    <option value="custom">Custom calendar</option>
-                  </select>
-                  {messageRange !== 'all' && (
+              ) : (
+                /* Normal Contact Header */
+                <div className="flex items-center justify-between gap-2 sm:gap-4 min-w-0">
+                  {/* Left: Avatar & Contact Info */}
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                    {/* Mobile Back Button */}
                     <button
                       type="button"
-                      onClick={() => { setMessageRange('all'); setCustomStart(''); setCustomEnd(''); }}
-                      className="p-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] hover:bg-[#F5C2C4] transition-colors"
-                      title="Clear date filter"
+                      onClick={() => setMobileView('list')}
+                      className="p-1.5 -ml-1 rounded-xl text-[#1A1A1A] hover:bg-[#FDEBEC] hover:text-[#D92228] transition-colors md:hidden cursor-pointer flex-shrink-0"
+                      title="Back to conversations list"
                     >
-                      <X className="w-3 h-3" />
+                      <ArrowLeft className="w-5 h-5" />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowDetails(!showDetails)}
-                    className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${
-                      showDetails
-                        ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
-                        : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'
-                    }`}
-                    title="Toggle Contact CRM Drawer"
-                  >
-                    {showDetails ? (
-                      <PanelRightClose className="w-4 h-4" />
-                    ) : (
-                      <PanelRightOpen className="w-4 h-4" />
+
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FDEBEC] text-[#D92228] font-bold text-xs sm:text-sm flex items-center justify-center border border-[#F5C2C4] shadow-xs flex-shrink-0">
+                      {activeData.conversation.contact?.profile_name?.[0]?.toUpperCase() || 'W'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xs sm:text-sm font-bold text-[#1A1A1A] truncate" title={activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}>
+                        {activeData.conversation.contact?.profile_name || 'WhatsApp Contact'}
+                      </h2>
+                      <p className="text-[10px] text-[#6B7280] font-mono sm:hidden truncate">
+                        +{activeData.conversation.contact?.wa_id}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right: Actions (Search, Reload, Archive, Delete, Message Range, CRM Drawer) */}
+                  <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                    {/* Search in chat toggle button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInChatSearch(true);
+                        setTimeout(() => searchInputRef.current?.focus(), 50);
+                      }}
+                      className="inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
+                      title="Search messages in this chat (Ctrl+F)"
+                    >
+                      <Search className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
+                      <span className="hidden xl:inline">Search</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleRefreshThread}
+                      disabled={refreshingThread}
+                      className="inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer disabled:opacity-60"
+                      title="Reload latest WhatsApp messages"
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 text-[#D92228] flex-shrink-0 ${
+                          refreshingThread ? 'animate-spin' : ''
+                        }`}
+                      />
+                      <span className="hidden xl:inline">{refreshingThread ? 'Reloading' : 'Reload'}</span>
+                    </button>
+
+                    {/* Archive Button */}
+                    <button
+                      type="button"
+                      onClick={handleToggleArchive}
+                      className={`inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                        activeData && archivedIds.has(activeData.conversation.id)
+                          ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                          : 'border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4]'
+                      }`}
+                      title={activeData && archivedIds.has(activeData.conversation.id) ? 'Unarchive conversation' : 'Archive conversation'}
+                    >
+                      <Archive className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
+                      <span className="hidden xl:inline">
+                        {activeData && archivedIds.has(activeData.conversation.id) ? 'Archived' : 'Archive'}
+                      </span>
+                    </button>
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={handleDeleteConversation}
+                      className="inline-flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#1A1A1A] hover:text-[#D92228] hover:bg-[#FDEBEC] hover:border-[#F5C2C4] transition-colors cursor-pointer"
+                      title="Delete conversation from inbox"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-[#D92228] flex-shrink-0" />
+                      <span className="hidden xl:inline">Delete</span>
+                    </button>
+
+                    <select
+                      value={messageRange}
+                      onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
+                      className={`pl-2 pr-1 sm:pl-2.5 sm:pr-2 py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer transition-colors max-w-[85px] sm:max-w-[110px] xl:max-w-none truncate ${
+                        messageRange !== 'all'
+                          ? 'border-[#D92228] bg-[#FDEBEC] text-[#D92228]'
+                          : 'border-[#E5E7EB] bg-white text-[#1A1A1A]'
+                      }`}
+                      title="Filter messages by date"
+                    >
+                      <option value="all">All messages</option>
+                      <option value="today">Today</option>
+                      <option value="yesterday">Yesterday</option>
+                      <option value="3">Last 3 days</option>
+                      <option value="7">Last 7 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="custom">Custom calendar</option>
+                    </select>
+                    {messageRange !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => { setMessageRange('all'); setCustomStart(''); setCustomEnd(''); }}
+                        className="p-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] hover:bg-[#F5C2C4] transition-colors"
+                        title="Clear date filter"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDetails(!showDetails)}
+                      className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${
+                        showDetails
+                          ? 'bg-[#FDEBEC] border-[#F5C2C4] text-[#D92228]'
+                          : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'
+                      }`}
+                      title="Toggle Contact CRM Drawer"
+                    >
+                      {showDetails ? (
+                        <PanelRightClose className="w-4 h-4" />
+                      ) : (
+                        <PanelRightOpen className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {messageRange !== 'all' && (
                 <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-[3.25rem]">
