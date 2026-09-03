@@ -124,6 +124,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     return new Set<number>();
   });
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   const handleToggleArchive = async () => {
     if (!selectedId) return;
     const currentlyArchived = archivedIds.has(selectedId);
@@ -165,8 +167,14 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     }
   };
 
-  // Instant delete without confirmation dialog — persists to Supabase database so all users never see it again
-  const handleDeleteConversation = async () => {
+  // Open confirmation dialog box
+  const handleDeleteConversation = () => {
+    if (!selectedId) return;
+    setShowDeleteModal(true);
+  };
+
+  // Confirmed delete: Hides from frontend across all users while keeping raw database intact
+  const handleConfirmDelete = async () => {
     if (!selectedId) return;
     const deletedConvId = selectedId;
     const targetConv = conversations.find((c) => c.id === deletedConvId) || activeData?.conversation;
@@ -201,6 +209,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       } catch {}
     }
 
+    setShowDeleteModal(false);
+
     // Select next conversation in list smoothly
     const remaining = filteredConversations.filter((c) => c.id !== deletedConvId);
     if (remaining.length > 0) {
@@ -210,7 +220,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       setActiveData(null);
     }
 
-    // 2. Persist to database so ANY user who logs in anywhere will NEVER see this chat again
+    // 2. Persist to database so ANY user who logs in anywhere will NEVER see this chat again (Soft-Delete: raw data preserved in Supabase)
     try {
       await api.deleteConversation(deletedConvId, {
         contact_id: contactId,
@@ -1336,6 +1346,52 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           totalMessages={activeData.messages.length}
           onClose={() => setShowDetails(false)}
         />
+      )}
+
+      {/* Delete Confirmation Popup Modal */}
+      {showDeleteModal && activeData && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center flex-shrink-0 border border-[#F5C2C4]">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-[#1A1A1A]">
+                  Delete Conversation?
+                </h3>
+                <p className="text-xs text-[#6B7280] mt-1.5 leading-relaxed">
+                  Are you sure you want to remove the conversation with{' '}
+                  <span className="font-semibold text-[#1A1A1A]">
+                    {activeData.conversation.contact?.profile_name || 'this contact'}
+                  </span>{' '}
+                  from your inbox view?
+                </p>
+                <div className="mt-2.5 p-2.5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] text-[#6B7280]">
+                  <span className="font-semibold text-[#1A1A1A]">🔒 Database Safe:</span> All messages and historical records remain safely preserved in Supabase. This chat is only hidden from the inbox across all devices and users.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#D92228] hover:bg-[#B71C21] text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Yes, Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Lightbox Modal */}
