@@ -54,8 +54,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Selected conversation ID from URL or initialId
+  // Selected conversation ID or contact ID from URL or initialId
   const parsedId = Number(searchParams.get('id'));
+  const parsedContactId = Number(searchParams.get('contact_id'));
   const urlId =
     Number.isFinite(parsedId) && parsedId > 0 ? parsedId : initialId;
 
@@ -69,7 +70,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedId, setSelectedId] = useState<number | null>(urlId || null);
-  const [mobileView, setMobileView] = useState<'list' | 'chat'>(urlId ? 'chat' : 'list');
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>(
+    urlId || parsedContactId ? 'chat' : 'list'
+  );
 
   // Layout drawer toggles
   const [collapseNavRail, setCollapseNavRail] = useState(false);
@@ -102,10 +105,28 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     try {
       if (showLoading) setLoadingList(true);
       const res = await api.getConversations();
-      setConversations(res.items || []);
+      const items = res.items || [];
+      setConversations(items);
       setListError(null);
 
-      setSelectedId((prev) => (prev ? prev : (res.items.length > 0 ? res.items[0].id : null)));
+      // Check if URL specified a contact_id or id
+      const cId = Number(searchParams.get('contact_id'));
+      const iId = Number(searchParams.get('id')) || initialId;
+
+      let match: Conversation | undefined;
+      if (cId) {
+        match = items.find((c) => c.contact_id === cId || c.contact?.id === cId);
+      }
+      if (!match && iId) {
+        match = items.find((c) => c.id === iId || c.contact_id === iId || c.contact?.id === iId);
+      }
+
+      if (match) {
+        setSelectedId(match.id);
+        if (showLoading) setMobileView('chat');
+      } else {
+        setSelectedId((prev) => (prev ? prev : (items.length > 0 ? items[0].id : null)));
+      }
     } catch (err: any) {
       console.error('Failed to load conversations:', err);
       if (showLoading) {
