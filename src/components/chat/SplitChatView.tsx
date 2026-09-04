@@ -102,10 +102,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     return conversations.find((c) => c.id === selectedId);
   }, [conversations, selectedId]);
 
-  const [messageRange, setMessageRange] = useState<'all' | 'today' | 'yesterday' | '3' | '7' | '30' | 'custom'>('all');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
-
   // In-conversation message search state
   const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [inChatSearch, setInChatSearch] = useState('');
@@ -366,12 +362,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
     let isMounted = true;
 
-    // Clear stale data and reset message filters when switching conversations
+    // Clear stale thread data when switching conversations
     setActiveData(null);
     setThreadError(null);
-    setMessageRange('all');
-    setCustomStart('');
-    setCustomEnd('');
     setShowInChatSearch(false);
     setInChatSearch('');
     setActiveMatchIndex(0);
@@ -446,7 +439,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     if (!activeData?.messages?.length) return [];
     const ordered = [...activeData.messages].sort((a, b) => (a.id || 0) - (b.id || 0));
 
-    if (messageRange === 'all') return ordered;
+    if (convDateRange === 'all') return ordered;
 
     // Helper: get today's date key in Karachi timezone
     const todayKey = new Intl.DateTimeFormat('en-CA', {
@@ -456,11 +449,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       day: '2-digit',
     }).format(new Date());
 
-    if (messageRange === 'today') {
+    if (convDateRange === 'today') {
       return ordered.filter((m) => karachiDateKey(m.sent_at || m.created_at) === todayKey);
     }
 
-    if (messageRange === 'yesterday') {
+    if (convDateRange === 'yesterday') {
       const yd = new Date();
       yd.setDate(yd.getDate() - 1);
       const yesterdayKey = new Intl.DateTimeFormat('en-CA', {
@@ -469,26 +462,23 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         month: '2-digit',
         day: '2-digit',
       }).format(yd);
-      return ordered.filter((m) => {
-        const d = karachiDateKey(m.sent_at || m.created_at);
-        return d === todayKey || d === yesterdayKey;
-      });
+      return ordered.filter((m) => karachiDateKey(m.sent_at || m.created_at) === yesterdayKey);
     }
 
-    if (messageRange === 'custom') {
-      if (!customStart && !customEnd) return ordered;
+    if (convDateRange === 'custom') {
+      if (!convCustomStart && !convCustomEnd) return ordered;
       // Compare using Karachi date strings (YYYY-MM-DD) so timezone is handled correctly
       return ordered.filter((m) => {
         const msgDate = karachiDateKey(m.sent_at || m.created_at);
         if (!msgDate) return false;
-        if (customStart && msgDate < customStart) return false;
-        if (customEnd && msgDate > customEnd) return false;
+        if (convCustomStart && msgDate < convCustomStart) return false;
+        if (convCustomEnd && msgDate > convCustomEnd) return false;
         return true;
       });
     }
 
     // Numeric range: "Last N days" — compare Karachi date strings
-    const days = Number(messageRange);
+    const days = Number(convDateRange);
     // Build the cutoff date key: today minus (days-1) days, expressed as YYYY-MM-DD in PKT
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
@@ -503,7 +493,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       const msgDate = karachiDateKey(m.sent_at || m.created_at);
       return !!msgDate && msgDate >= cutoffKey;
     });
-  }, [activeData?.messages, messageRange, customStart, customEnd]);
+  }, [activeData?.messages, convDateRange, convCustomStart, convCustomEnd]);
 
   // In-conversation message search matching & navigation
   const matchingMessageIds = useMemo(() => {
@@ -1231,14 +1221,14 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                     )}
 
                     <select
-                      value={messageRange}
-                      onChange={(e) => setMessageRange(e.target.value as typeof messageRange)}
+                      value={convDateRange}
+                      onChange={(e) => setConvDateRange(e.target.value as typeof convDateRange)}
                       className={`pl-2 pr-1 sm:pl-2.5 sm:pr-2 py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer transition-colors max-w-[85px] sm:max-w-[110px] xl:max-w-none truncate ${
-                        messageRange !== 'all'
-                          ? 'border-[#D92228] bg-[#FDEBEC] text-[#D92228]'
+                        convDateRange !== 'all'
+                          ? 'border-[#D92228] bg-[#FDEBEC] text-[#D92228] font-bold'
                           : 'border-[#E5E7EB] bg-white text-[#1A1A1A]'
                       }`}
-                      title="Filter messages by date"
+                      title="Filter conversations and messages by date"
                     >
                       <option value="all">All messages</option>
                       <option value="today">Today</option>
@@ -1248,11 +1238,15 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                       <option value="30">Last 30 days</option>
                       <option value="custom">Custom calendar</option>
                     </select>
-                    {messageRange !== 'all' && (
+                    {convDateRange !== 'all' && (
                       <button
                         type="button"
-                        onClick={() => { setMessageRange('all'); setCustomStart(''); setCustomEnd(''); }}
-                        className="p-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] hover:bg-[#F5C2C4] transition-colors"
+                        onClick={() => {
+                          setConvDateRange('all');
+                          setConvCustomStart('');
+                          setConvCustomEnd('');
+                        }}
+                        className="p-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] hover:bg-[#F5C2C4] transition-colors cursor-pointer"
                         title="Clear date filter"
                       >
                         <X className="w-3 h-3" />
@@ -1278,22 +1272,22 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 </div>
               )}
 
-              {messageRange !== 'all' && (
+              {convDateRange !== 'all' && (
                 <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-[3.25rem]">
-                  {messageRange === 'custom' && (
+                  {convDateRange === 'custom' && (
                     <span className="flex items-center gap-1">
                       <input
                         type="date"
-                        value={customStart}
-                        onChange={(e) => setCustomStart(e.target.value)}
+                        value={convCustomStart}
+                        onChange={(e) => setConvCustomStart(e.target.value)}
                         className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
                         title="Start date"
                       />
                       <span className="text-[10px] text-[#9CA3AF]">to</span>
                       <input
                         type="date"
-                        value={customEnd}
-                        onChange={(e) => setCustomEnd(e.target.value)}
+                        value={convCustomEnd}
+                        onChange={(e) => setConvCustomEnd(e.target.value)}
                         className="px-1.5 py-1 rounded-lg border border-[#E5E7EB] text-[11px] text-[#1A1A1A]"
                         title="End date"
                       />
