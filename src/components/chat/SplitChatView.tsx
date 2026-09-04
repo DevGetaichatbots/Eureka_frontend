@@ -129,6 +129,16 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     return new Set<number>();
   });
 
+  const [deletedCutoffs, setDeletedCutoffs] = useState<Record<string, string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('eureka_deleted_cutoffs');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const handleToggleArchive = async () => {
@@ -178,15 +188,37 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     setShowDeleteModal(true);
   };
 
-  // Confirmed delete: Hides from frontend across all users while keeping raw database intact
+  // Confirmed delete (WhatsApp-style): Records deletion timestamp cutoff.
+  // Past historical messages before this timestamp are hidden from active view,
+  // and when new messages arrive from today onwards, the chat reappears starting fresh!
   const handleConfirmDelete = async () => {
     if (!selectedId) return;
     const deletedConvId = selectedId;
     const targetConv = conversations.find((c) => c.id === deletedConvId) || activeData?.conversation;
     const waId = targetConv?.contact?.wa_id || null;
     const contactId = targetConv?.contact_id || targetConv?.contact?.id || null;
+    const nowIso = new Date().toISOString();
 
-    // 1. Instantly hide all conversations for this contact from frontend UI state
+    // 1. Record deletion timestamp cutoff (WhatsApp-style Clear/Delete)
+    setDeletedCutoffs((prev) => {
+      const next = { ...prev };
+      next[String(deletedConvId)] = nowIso;
+      if (contactId) next[String(contactId)] = nowIso;
+      if (waId) {
+        next[waId] = nowIso;
+        const digits = waId.replace(/\D/g, '');
+        if (digits) {
+          next[digits] = nowIso;
+          next[`+${digits}`] = nowIso;
+        }
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('eureka_deleted_cutoffs', JSON.stringify(next));
+      }
+      return next;
+    });
+
+    // 2. Hide from current conversation list until a newer message arrives
     setDeletedIds((prev) => {
       const next = new Set(prev).add(deletedConvId);
       if (contactId) {
@@ -232,7 +264,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       setActiveData(null);
     }
 
-    // 2. Persist to database so ANY user who logs in anywhere will NEVER see this chat again (Soft-Delete: raw data preserved in Supabase)
+    // 3. Persist to database (Soft-Delete audit record: raw data preserved in Supabase)
     try {
       await api.deleteConversation(deletedConvId, {
         contact_id: contactId,
@@ -250,6 +282,10 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         const savedChats = localStorage.getItem('eureka_deleted_chats');
         if (savedChats) {
           setDeletedIds(new Set<number>(JSON.parse(savedChats)));
+        }
+        const savedCutoffs = localStorage.getItem('eureka_deleted_cutoffs');
+        if (savedCutoffs) {
+          setDeletedCutoffs(JSON.parse(savedCutoffs));
         }
       } catch {}
     };
@@ -435,11 +471,29 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     }
   };
 
-  const sortedMessages = useMemo(() => {
+  const baseVisibleMessages = useMemo(() => {
     if (!activeData?.messages?.length) return [];
     const ordered = [...activeData.messages].sort((a, b) => (a.id || 0) - (b.id || 0));
+    const conv = activeData.conversation;
+    const cutoffIso =
+      (conv?.id && deletedCutoffs[String(conv.id)]) ||
+      (conv?.contact_id && deletedCutoffs[String(conv.contact_id)]) ||
+      (conv?.contact?.id && deletedCutoffs[String(conv.contact.id)]) ||
+      (conv?.contact?.wa_id && (deletedCutoffs[conv.contact.wa_id] || deletedCutoffs[conv.contact.wa_id.replace(/\D/g, '')]));
 
-    if (convDateRange === 'all') return ordered;
+    if (cutoffIso) {
+      const cutoffTime = new Date(cutoffIso).getTime();
+      return ordered.filter((m) => {
+        const msgTime = new Date(m.sent_at || m.created_at).getTime();
+        return msgTime > cutoffTime;
+      });
+    }
+    return ordered;
+  }, [activeData?.messages, activeData?.conversation, deletedCutoffs]);
+
+  const sortedMessages = useMemo(() => {
+    if (!baseVisibleMessages.length) return [];
+    if (convDateRange === 'all') return baseVisibleMessages;
 
     // Helper: get today's date key in Karachi timezone
     const todayKey = new Intl.DateTimeFormat('en-CA', {
@@ -450,7 +504,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     }).format(new Date());
 
     if (convDateRange === 'today') {
-      return ordered.filter((m) => karachiDateKey(m.sent_at || m.created_at) === todayKey);
+      return baseVisibleMessages.filter((m) => karachiDateKey(m.sent_at || m.created_at) === todayKey);
     }
 
     if (convDateRange === 'yesterday') {
@@ -462,13 +516,13 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         month: '2-digit',
         day: '2-digit',
       }).format(yd);
-      return ordered.filter((m) => karachiDateKey(m.sent_at || m.created_at) === yesterdayKey);
+      return baseVisibleMessages.filter((m) => karachiDateKey(m.sent_at || m.created_at) === yesterdayKey);
     }
 
     if (convDateRange === 'custom') {
-      if (!convCustomStart && !convCustomEnd) return ordered;
+      if (!convCustomStart && !convCustomEnd) return baseVisibleMessages;
       // Compare using Karachi date strings (YYYY-MM-DD) so timezone is handled correctly
-      return ordered.filter((m) => {
+      return baseVisibleMessages.filter((m) => {
         const msgDate = karachiDateKey(m.sent_at || m.created_at);
         if (!msgDate) return false;
         if (convCustomStart && msgDate < convCustomStart) return false;
@@ -479,7 +533,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
     // Numeric range: "Last N days" — compare Karachi date strings
     const days = Number(convDateRange);
-    // Build the cutoff date key: today minus (days-1) days, expressed as YYYY-MM-DD in PKT
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
     const cutoffKey = new Intl.DateTimeFormat('en-CA', {
@@ -489,11 +542,11 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       day: '2-digit',
     }).format(cutoffDate);
 
-    return ordered.filter((m) => {
+    return baseVisibleMessages.filter((m) => {
       const msgDate = karachiDateKey(m.sent_at || m.created_at);
       return !!msgDate && msgDate >= cutoffKey;
     });
-  }, [activeData?.messages, convDateRange, convCustomStart, convCustomEnd]);
+  }, [baseVisibleMessages, convDateRange, convCustomStart, convCustomEnd]);
 
   // In-conversation message search matching & navigation
   const matchingMessageIds = useMemo(() => {
@@ -603,7 +656,22 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   // Counts for folders
   const folderCounts = useMemo(() => {
-    const nonDeleted = conversations.filter((c) => !deletedIds.has(c.id));
+    const nonDeleted = conversations.filter((conv) => {
+      const cutoffIso =
+        (conv.id && deletedCutoffs[String(conv.id)]) ||
+        (conv.contact_id && deletedCutoffs[String(conv.contact_id)]) ||
+        (conv.contact?.id && deletedCutoffs[String(conv.contact.id)]) ||
+        (conv.contact?.wa_id && (deletedCutoffs[conv.contact.wa_id] || deletedCutoffs[conv.contact.wa_id.replace(/\D/g, '')]));
+
+      if (cutoffIso) {
+        const cutoffTime = new Date(cutoffIso).getTime();
+        const lastTime = new Date(conv.last_message_at || conv.last_message?.sent_at || conv.started_at).getTime();
+        if (lastTime <= cutoffTime) return false;
+      } else if (deletedIds.has(conv.id)) {
+        return false;
+      }
+      return true;
+    });
     const archivedCount = nonDeleted.filter((c) => archivedIds.has(c.id)).length;
     const nonArchived = nonDeleted.filter((c) => !archivedIds.has(c.id));
     const total = nonArchived.length;
@@ -616,13 +684,29 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       reminders: 1,
       archived: archivedCount,
     };
-  }, [conversations, archivedIds, deletedIds]);
+  }, [conversations, archivedIds, deletedIds, deletedCutoffs]);
 
   // Filtered & Sorted conversations list
   const filteredConversations = useMemo(() => {
     const rows = conversations
       .filter((conv) => {
-        if (deletedIds.has(conv.id)) return false;
+        // WhatsApp-style Delete/Clear Cutoff filter:
+        // Hide conversation if no new message has arrived since the user deleted it.
+        const cutoffIso =
+          (conv.id && deletedCutoffs[String(conv.id)]) ||
+          (conv.contact_id && deletedCutoffs[String(conv.contact_id)]) ||
+          (conv.contact?.id && deletedCutoffs[String(conv.contact.id)]) ||
+          (conv.contact?.wa_id && (deletedCutoffs[conv.contact.wa_id] || deletedCutoffs[conv.contact.wa_id.replace(/\D/g, '')]));
+
+        if (cutoffIso) {
+          const cutoffTime = new Date(cutoffIso).getTime();
+          const lastTime = new Date(conv.last_message_at || conv.last_message?.sent_at || conv.started_at).getTime();
+          if (lastTime <= cutoffTime) {
+            return false;
+          }
+        } else if (deletedIds.has(conv.id)) {
+          return false;
+        }
 
         const isArchived = archivedIds.has(conv.id);
         if (selectedFolder === 'archived' || chatFilter === 'archived') {
@@ -1262,10 +1346,10 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                     </span>
                   )}
                   {/* Filter result count */}
-                  {activeData?.messages?.length != null && (
+                  {baseVisibleMessages.length > 0 && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FDEBEC] text-[#D92228] border border-[#F5C2C4] whitespace-nowrap">
                       <Filter className="w-2.5 h-2.5" />
-                      {sortedMessages.length} / {activeData.messages.length} messages
+                      {sortedMessages.length} / {baseVisibleMessages.length} messages
                     </span>
                   )}
                 </div>
