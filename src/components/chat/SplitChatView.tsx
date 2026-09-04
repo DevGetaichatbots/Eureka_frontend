@@ -143,17 +143,33 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   const handleToggleArchive = async () => {
     if (!selectedId) return;
+    const targetConv = conversations.find((c) => c.id === selectedId) || activeData?.conversation;
+    const contactId = targetConv?.contact_id || targetConv?.contact?.id || null;
+    const waId = targetConv?.contact?.wa_id || null;
     const currentlyArchived = archivedIds.has(selectedId) || !!activeData?.conversation?.is_archived;
     const newArchivedState = !currentlyArchived;
 
-    // 1. Optimistic UI update immediately
+    // 1. Optimistic UI update immediately across ALL conversations for this contact
     setArchivedIds((prev) => {
       const next = new Set(prev);
-      if (newArchivedState) {
-        next.add(selectedId);
-      } else {
-        next.delete(selectedId);
-      }
+      const allMatchingIds = new Set<number>([selectedId]);
+      conversations.forEach((c) => {
+        if (
+          (contactId && (c.contact_id === contactId || c.contact?.id === contactId)) ||
+          (waId && c.contact?.wa_id === waId)
+        ) {
+          allMatchingIds.add(c.id);
+        }
+      });
+
+      allMatchingIds.forEach((id) => {
+        if (newArchivedState) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+      });
+
       if (typeof window !== 'undefined') {
         localStorage.setItem('eureka_archived_chats', JSON.stringify(Array.from(next)));
       }
@@ -161,13 +177,26 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
     });
 
     setConversations((prev) =>
-      prev.map((c) => (c.id === selectedId ? { ...c, is_archived: newArchivedState } : c))
+      prev.map((c) => {
+        const isMatch =
+          c.id === selectedId ||
+          (contactId && (c.contact_id === contactId || c.contact?.id === contactId)) ||
+          (waId && c.contact?.wa_id === waId);
+        return isMatch ? { ...c, is_archived: newArchivedState } : c;
+      })
     );
+
     setActiveData((prev) =>
       prev ? { ...prev, conversation: { ...prev.conversation, is_archived: newArchivedState } } : prev
     );
 
-    const remaining = filteredConversations.filter((c) => c.id !== selectedId);
+    const remaining = filteredConversations.filter(
+      (c) =>
+        c.id !== selectedId &&
+        (!contactId || (c.contact_id !== contactId && c.contact?.id !== contactId)) &&
+        (!waId || c.contact?.wa_id !== waId)
+    );
+
     if (newArchivedState && (selectedFolder !== 'archived' && chatFilter !== 'archived')) {
       if (remaining.length > 0) {
         handleSelectConversation(remaining[0].id);
@@ -186,12 +215,9 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
     // 2. Persist to Supabase database (including chat user name and details)
     try {
-      const conv = conversations.find((c) => c.id === selectedId) || activeData?.conversation;
-      const contactName = conv?.contact?.profile_name || activeData?.conversation?.contact?.profile_name || 'WhatsApp Contact';
-      const waId = conv?.contact?.wa_id || activeData?.conversation?.contact?.wa_id || null;
-      const contactId = conv?.contact_id || activeData?.conversation?.contact_id || null;
-      const lastMsg = conv?.last_message?.body || (activeData?.messages?.length ? activeData.messages[activeData.messages.length - 1].body : null);
-      const msgCount = conv?.message_count || activeData?.messages?.length || 0;
+      const contactName = targetConv?.contact?.profile_name || activeData?.conversation?.contact?.profile_name || 'WhatsApp Contact';
+      const lastMsg = targetConv?.last_message?.body || (activeData?.messages?.length ? activeData.messages[activeData.messages.length - 1].body : null);
+      const msgCount = targetConv?.message_count || activeData?.messages?.length || 0;
 
       await api.archiveConversation(selectedId, newArchivedState, {
         chat_user_name: contactName,
