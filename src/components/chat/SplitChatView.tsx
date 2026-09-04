@@ -758,7 +758,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 <option value="open">Open Chats</option>
                 <option value="active24h">Active 24h</option>
                 <option value="closed">Closed</option>
-                <option value="archived">Archived ({archivedIds.size})</option>
+                <option value="archived">Archived</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
