@@ -1220,38 +1220,6 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                       </>
                     )}
 
-                    <select
-                      value={convDateRange}
-                      onChange={(e) => setConvDateRange(e.target.value as typeof convDateRange)}
-                      className={`pl-2 pr-1 sm:pl-2.5 sm:pr-2 py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer transition-colors max-w-[85px] sm:max-w-[110px] xl:max-w-none truncate ${
-                        convDateRange !== 'all'
-                          ? 'border-[#D92228] bg-[#FDEBEC] text-[#D92228] font-bold'
-                          : 'border-[#E5E7EB] bg-white text-[#1A1A1A]'
-                      }`}
-                      title="Filter conversations and messages by date"
-                    >
-                      <option value="all">All messages</option>
-                      <option value="today">Today</option>
-                      <option value="yesterday">Yesterday</option>
-                      <option value="3">Last 3 days</option>
-                      <option value="7">Last 7 days</option>
-                      <option value="30">Last 30 days</option>
-                      <option value="custom">Custom calendar</option>
-                    </select>
-                    {convDateRange !== 'all' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConvDateRange('all');
-                          setConvCustomStart('');
-                          setConvCustomEnd('');
-                        }}
-                        className="p-1.5 rounded-lg bg-[#FDEBEC] text-[#D92228] hover:bg-[#F5C2C4] transition-colors cursor-pointer"
-                        title="Clear date filter"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => setShowDetails(!showDetails)}
