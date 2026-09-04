@@ -143,7 +143,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   const handleToggleArchive = async () => {
     if (!selectedId) return;
-    const currentlyArchived = archivedIds.has(selectedId);
+    const currentlyArchived = archivedIds.has(selectedId) || !!activeData?.conversation?.is_archived;
     const newArchivedState = !currentlyArchived;
 
     // 1. Optimistic UI update immediately
@@ -160,7 +160,14 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       return next;
     });
 
-    // 2. Persist to database (including chat user name and details)
+    setConversations((prev) =>
+      prev.map((c) => (c.id === selectedId ? { ...c, is_archived: newArchivedState } : c))
+    );
+    setActiveData((prev) =>
+      prev ? { ...prev, conversation: { ...prev.conversation, is_archived: newArchivedState } } : prev
+    );
+
+    // 2. Persist to Supabase database (including chat user name and details)
     try {
       const conv = conversations.find((c) => c.id === selectedId) || activeData?.conversation;
       const contactName = conv?.contact?.profile_name || activeData?.conversation?.contact?.profile_name || 'WhatsApp Contact';
@@ -177,6 +184,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
         message_count: msgCount,
         archived_by_user: 'admin@eurekajo.com',
       });
+      await loadConversations(false);
     } catch (err) {
       console.error('Failed to persist archive status to Supabase:', err);
     }
@@ -318,15 +326,16 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
       // Sync archived IDs from database
       if (res.items?.length) {
-        setArchivedIds((prev) => {
-          const next = new Set(prev);
-          res.items.forEach((conv) => {
-            if (conv.is_archived) {
-              next.add(conv.id);
-            }
-          });
-          return next;
+        const dbArchivedSet = new Set<number>();
+        res.items.forEach((conv) => {
+          if (conv.is_archived) {
+            dbArchivedSet.add(conv.id);
+          }
         });
+        setArchivedIds(dbArchivedSet);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('eureka_archived_chats', JSON.stringify(Array.from(dbArchivedSet)));
+        }
 
         // If server returns an active conversation (e.g. new WhatsApp message arrived), revive it in UI
         setDeletedIds((prev) => {
@@ -656,6 +665,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
 
   // Counts for folders
   const folderCounts = useMemo(() => {
+    const isArchived = (c: Conversation) => archivedIds.has(c.id) || !!c.is_archived;
     const nonDeleted = conversations.filter((conv) => {
       const cutoffIso =
         (conv.id && deletedCutoffs[String(conv.id)]) ||
@@ -672,8 +682,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       }
       return true;
     });
-    const archivedCount = nonDeleted.filter((c) => archivedIds.has(c.id)).length;
-    const nonArchived = nonDeleted.filter((c) => !archivedIds.has(c.id));
+    const archivedCount = nonDeleted.filter((c) => isArchived(c)).length;
+    const nonArchived = nonDeleted.filter((c) => !isArchived(c));
     const total = nonArchived.length;
     const active = nonArchived.filter((c) => isWithin24Hours(c.last_message_at)).length;
     return {
@@ -708,7 +718,7 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
           return false;
         }
 
-        const isArchived = archivedIds.has(conv.id);
+        const isArchived = archivedIds.has(conv.id) || !!conv.is_archived;
         if (selectedFolder === 'archived' || chatFilter === 'archived') {
           if (!isArchived) return false;
         } else {
