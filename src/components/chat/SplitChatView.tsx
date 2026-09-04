@@ -167,6 +167,23 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       prev ? { ...prev, conversation: { ...prev.conversation, is_archived: newArchivedState } } : prev
     );
 
+    const remaining = filteredConversations.filter((c) => c.id !== selectedId);
+    if (newArchivedState && (selectedFolder !== 'archived' && chatFilter !== 'archived')) {
+      if (remaining.length > 0) {
+        handleSelectConversation(remaining[0].id);
+      } else {
+        setSelectedId(null);
+        setActiveData(null);
+      }
+    } else if (!newArchivedState && (selectedFolder === 'archived' || chatFilter === 'archived')) {
+      if (remaining.length > 0) {
+        handleSelectConversation(remaining[0].id);
+      } else {
+        setSelectedId(null);
+        setActiveData(null);
+      }
+    }
+
     // 2. Persist to Supabase database (including chat user name and details)
     try {
       const conv = conversations.find((c) => c.id === selectedId) || activeData?.conversation;
