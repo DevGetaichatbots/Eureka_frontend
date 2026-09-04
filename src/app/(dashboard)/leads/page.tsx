@@ -41,6 +41,16 @@ export default function LeadsPage() {
     return new Set<string>();
   });
 
+  const [deletedCutoffs, setDeletedCutoffs] = useState<Record<string, string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('eureka_deleted_cutoffs');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
+
   useEffect(() => {
     const syncDeleted = () => {
       try {
@@ -50,6 +60,8 @@ export default function LeadsPage() {
         if (saved) JSON.parse(saved).forEach((k: any) => set.add(String(k)));
         if (savedChats) JSON.parse(savedChats).forEach((k: any) => set.add(String(k)));
         setDeletedLeadKeys(set);
+        const savedCutoffs = localStorage.getItem('eureka_deleted_cutoffs');
+        if (savedCutoffs) setDeletedCutoffs(JSON.parse(savedCutoffs));
       } catch {}
     };
 
@@ -62,12 +74,25 @@ export default function LeadsPage() {
     };
   }, []);
 
-
-
   const handleDeleteLead = async (contact: Contact) => {
     const rawWa = contact.wa_id || '';
     const digits = rawWa.replace(/\D/g, '');
     const idStr = String(contact.id || '');
+    const nowIso = new Date().toISOString();
+
+    setDeletedCutoffs((prev) => {
+      const next = { ...prev };
+      if (idStr) next[idStr] = nowIso;
+      if (rawWa) next[rawWa] = nowIso;
+      if (digits) {
+        next[digits] = nowIso;
+        next[`+${digits}`] = nowIso;
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('eureka_deleted_cutoffs', JSON.stringify(next));
+      }
+      return next;
+    });
 
     setDeletedLeadKeys((prev) => {
       const next = new Set(prev);
@@ -153,7 +178,7 @@ export default function LeadsPage() {
     loadLeads(page);
   };
 
-  // Contacts excluding deleted ones
+  // Contacts excluding deleted ones unless they have new activity after deletion
   const visibleContacts = useMemo(() => {
     const safeList = contacts || [];
     return safeList.filter((c) => {
@@ -163,7 +188,21 @@ export default function LeadsPage() {
       const idStr = String(c.id || '');
       const contactIdStr = String((c as any).contact_id || '');
 
-      if (
+      const cutoffIso =
+        (idStr && deletedCutoffs[idStr]) ||
+        (contactIdStr && deletedCutoffs[contactIdStr]) ||
+        (rawWa && deletedCutoffs[rawWa]) ||
+        (waDigits && deletedCutoffs[waDigits]) ||
+        (plusWa && deletedCutoffs[plusWa]);
+
+      if (cutoffIso) {
+        const cutoffTime = new Date(cutoffIso).getTime();
+        const lastSeenTime = new Date(c.last_seen_at || c.first_seen_at).getTime();
+        // If contact has sent a new message since deletion, show them updated!
+        if (lastSeenTime <= cutoffTime) {
+          return false;
+        }
+      } else if (
         deletedLeadKeys.has(rawWa) ||
         (waDigits && deletedLeadKeys.has(waDigits)) ||
         deletedLeadKeys.has(plusWa) ||
@@ -174,7 +213,7 @@ export default function LeadsPage() {
       }
       return true;
     });
-  }, [contacts, deletedLeadKeys]);
+  }, [contacts, deletedLeadKeys, deletedCutoffs]);
 
   // Client-side search filtering
   const filteredContacts = useMemo(() => {
