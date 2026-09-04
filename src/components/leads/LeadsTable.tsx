@@ -35,12 +35,55 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
   const [navigatingId, setNavigatingId] = useState<number | null>(null);
   const [leadToDelete, setLeadToDelete] = useState<Contact | null>(null);
 
-  const fetchLeadMessages = async (contactId: number): Promise<Message[]> => {
+  const [deletedCutoffs, setDeletedCutoffs] = useState<Record<string, string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('eureka_deleted_cutoffs');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
+
+  React.useEffect(() => {
+    const syncDeleted = () => {
+      try {
+        const saved = localStorage.getItem('eureka_deleted_cutoffs');
+        if (saved) setDeletedCutoffs(JSON.parse(saved));
+      } catch {}
+    };
+    window.addEventListener('storage', syncDeleted);
+    window.addEventListener('eureka_deleted_updated', syncDeleted);
+    return () => {
+      window.removeEventListener('storage', syncDeleted);
+      window.removeEventListener('eureka_deleted_updated', syncDeleted);
+    };
+  }, []);
+
+  const fetchLeadMessages = async (contact: Contact): Promise<Message[]> => {
     try {
-      const res = await api.getConversation(contactId);
-      return res?.messages || [];
+      const res = await api.getConversation(contact.id);
+      const allMsgs = res?.messages || [];
+      const rawWa = contact.wa_id || '';
+      const waDigits = rawWa.replace(/\D/g, '');
+      const plusWa = rawWa.startsWith('+') ? rawWa : `+${rawWa}`;
+      const idStr = String(contact.id || '');
+      const cutoffIso =
+        (idStr && deletedCutoffs[idStr]) ||
+        (rawWa && deletedCutoffs[rawWa]) ||
+        (waDigits && deletedCutoffs[waDigits]) ||
+        (plusWa && deletedCutoffs[plusWa]);
+
+      if (cutoffIso) {
+        const cutoffTime = new Date(cutoffIso).getTime();
+        return allMsgs.filter((m) => {
+          const msgTime = new Date(m.sent_at || m.created_at).getTime();
+          return msgTime > cutoffTime;
+        });
+      }
+      return allMsgs;
     } catch (err) {
-      console.error(`Failed to fetch messages for contact #${contactId}:`, err);
+      console.error(`Failed to fetch messages for contact #${contact.id}:`, err);
       return [];
     }
   };
@@ -48,7 +91,7 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
   const handleDownloadSingleCsv = async (contact: Contact) => {
     setDownloadingId({ id: contact.id, type: 'csv' });
     try {
-      const messages = await fetchLeadMessages(contact.id);
+      const messages = await fetchLeadMessages(contact);
       const name = contact.profile_name || 'WhatsApp User';
       const phone = formatPhone(contact.wa_id);
 
@@ -91,7 +134,7 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
   const handleDownloadSingleXlsx = async (contact: Contact) => {
     setDownloadingId({ id: contact.id, type: 'xlsx' });
     try {
-      const messages = await fetchLeadMessages(contact.id);
+      const messages = await fetchLeadMessages(contact);
       const name = contact.profile_name || 'WhatsApp User';
       const phone = formatPhone(contact.wa_id);
 
