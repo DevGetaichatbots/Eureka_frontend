@@ -15,6 +15,7 @@ import {
   Users,
   Shield,
   UserCheck,
+  UserX,
   Lock,
   ArrowLeft,
   X,
@@ -35,6 +36,9 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [userToToggle, setUserToToggle] = useState<{ user: User; nextStatus: 'active' | 'disabled' } | null>(null);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [toggleStatusError, setToggleStatusError] = useState<string | null>(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -62,15 +66,29 @@ export default function UsersPage() {
     loadUsers();
   };
 
-  const handleToggleStatus = async (userId: number, currentStatus: 'active' | 'disabled') => {
+  const handleToggleStatus = (userId: number, currentStatus: 'active' | 'disabled') => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
     const nextStatus = currentStatus === 'active' ? 'disabled' : 'active';
+    setToggleStatusError(null);
+    setUserToToggle({ user: target, nextStatus });
+  };
+
+  const handleConfirmToggleStatus = async () => {
+    if (!userToToggle || isTogglingStatus) return;
+    setIsTogglingStatus(true);
+    setToggleStatusError(null);
     try {
-      const updated = await api.updateUser(userId, { status: nextStatus });
+      const updated = await api.updateUser(userToToggle.user.id, { status: userToToggle.nextStatus });
       setUsers((prev) =>
-        (prev || []).map((u) => (u.id === userId ? { ...u, status: updated.status } : u))
+        (prev || []).map((u) => (u.id === userToToggle.user.id ? { ...u, status: updated.status } : u))
       );
-    } catch (err) {
+      setUserToToggle(null);
+    } catch (err: any) {
       console.error('Failed to update status:', err);
+      setToggleStatusError(err?.message || 'Failed to update user status. Please try again.');
+    } finally {
+      setIsTogglingStatus(false);
     }
   };
 
@@ -330,6 +348,100 @@ export default function UsersPage() {
                   <>
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Yes, Delete User</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disable / Enable User Confirmation Modal */}
+      {userToToggle && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#111b21] rounded-2xl shadow-2xl border border-[#E5E7EB] dark:border-[#26353d] max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-4">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border ${
+                  userToToggle.nextStatus === 'disabled'
+                    ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50'
+                }`}
+              >
+                {userToToggle.nextStatus === 'disabled' ? (
+                  <UserX className="w-6 h-6 text-amber-600" />
+                ) : (
+                  <UserCheck className="w-6 h-6 text-emerald-600" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-[#1A1A1A] dark:text-white">
+                  {userToToggle.nextStatus === 'disabled' ? 'Disable User Access?' : 'Enable User Access?'}
+                </h3>
+                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-1.5 leading-relaxed">
+                  Are you sure you want to {userToToggle.nextStatus === 'disabled' ? 'disable' : 'enable'} access for{' '}
+                  <span className="font-semibold text-[#1A1A1A] dark:text-white">
+                    {userToToggle.user.email}
+                  </span>?
+                </p>
+                <div className="mt-2.5 p-2.5 rounded-xl bg-[#F9FAFB] dark:bg-[#162026] border border-[#E5E7EB] dark:border-[#26353d] text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
+                  {userToToggle.nextStatus === 'disabled' ? (
+                    <>
+                      <span className="font-semibold text-[#1A1A1A] dark:text-white">🔒 Reversible Action:</span> Their active login session will be paused immediately. You can re-enable this user account at any time.
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-[#1A1A1A] dark:text-white">🔓 Account Restored:</span> The user will immediately be able to log back into the CRM system.
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {toggleStatusError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-xs text-red-700 dark:text-red-400 flex items-start gap-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span className="font-medium">{toggleStatusError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB] dark:border-[#26353d]">
+              <button
+                type="button"
+                disabled={isTogglingStatus}
+                onClick={() => {
+                  if (!isTogglingStatus) {
+                    setUserToToggle(null);
+                    setToggleStatusError(null);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E5E7EB] dark:border-[#26353d] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#1A1A1A] hover:bg-[#F9FAFB] dark:hover:bg-[#202c33] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isTogglingStatus}
+                onClick={handleConfirmToggleStatus}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold text-white transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${
+                  userToToggle.nextStatus === 'disabled'
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+              >
+                {isTogglingStatus ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{userToToggle.nextStatus === 'disabled' ? 'Disabling User...' : 'Enabling User...'}</span>
+                  </>
+                ) : (
+                  <>
+                    {userToToggle.nextStatus === 'disabled' ? (
+                      <UserX className="w-3.5 h-3.5" />
+                    ) : (
+                      <UserCheck className="w-3.5 h-3.5" />
+                    )}
+                    <span>{userToToggle.nextStatus === 'disabled' ? 'Yes, Disable User' : 'Yes, Enable User'}</span>
                   </>
                 )}
               </button>
