@@ -249,6 +249,22 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
             const isDownloadingCsv = downloadingId?.id === contact.id && downloadingId.type === 'csv';
             const isDownloadingXlsx = downloadingId?.id === contact.id && downloadingId.type === 'xlsx';
 
+            const rawWa = contact.wa_id || '';
+            const waDigits = rawWa.replace(/\D/g, '');
+            const plusWa = rawWa.startsWith('+') ? rawWa : `+${rawWa}`;
+            const idStr = String(contact.id || '');
+            const cutoffIso =
+              (idStr && deletedCutoffs[idStr]) ||
+              (rawWa && deletedCutoffs[rawWa]) ||
+              (waDigits && deletedCutoffs[waDigits]) ||
+              (plusWa && deletedCutoffs[plusWa]);
+
+            const displayFirstSeen = cutoffIso
+              ? new Date(contact.first_seen_at).getTime() <= new Date(cutoffIso).getTime()
+                ? cutoffIso
+                : contact.first_seen_at
+              : contact.first_seen_at;
+
             return (
               <tr
                 key={contact.id}
@@ -275,7 +291,7 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
                 <td className="py-4 px-4 hidden md:table-cell text-[#6B7280] dark:text-[#9CA3AF]">
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-[#D92228]" />
-                    <span>{formatKarachiDateTime(contact.first_seen_at)}</span>
+                    <span>{formatKarachiDateTime(displayFirstSeen)}</span>
                   </div>
                 </td>
 

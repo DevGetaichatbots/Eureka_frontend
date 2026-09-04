@@ -1548,7 +1548,12 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
       {showDetails && activeData && (
         <ContactDetailsDrawer
           conversation={activeData.conversation}
-          totalMessages={activeData.messages.length}
+          totalMessages={baseVisibleMessages.length}
+          firstSeenAt={
+            baseVisibleMessages.length > 0
+              ? String(baseVisibleMessages[0].sent_at || baseVisibleMessages[0].created_at || '')
+              : undefined
+          }
           onClose={() => setShowDetails(false)}
         />
       )}

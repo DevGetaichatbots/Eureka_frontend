@@ -15,12 +15,14 @@ import {
 interface ContactDetailsDrawerProps {
   conversation: Conversation;
   totalMessages: number;
+  firstSeenAt?: string | null;
   onClose?: () => void;
 }
 
 export function ContactDetailsDrawer({
   conversation,
   totalMessages,
+  firstSeenAt,
   onClose,
 }: ContactDetailsDrawerProps) {
   const contact = conversation.contact;
@@ -96,7 +98,7 @@ export function ContactDetailsDrawer({
               <label className="text-[10px] font-medium text-[#6B7280]">First Inbound Contact</label>
               <div className="flex items-center gap-2 text-[#1A1A1A]">
                 <Calendar className="w-3.5 h-3.5 text-[#D92228]" />
-                <span>{formatKarachiDateTime(contact?.first_seen_at)}</span>
+                <span>{formatKarachiDateTime(firstSeenAt || contact?.first_seen_at || conversation.started_at)}</span>
               </div>
             </div>
 
