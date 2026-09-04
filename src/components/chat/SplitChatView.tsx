@@ -755,10 +755,10 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 onChange={(e) => setChatFilter(e.target.value as any)}
                 className="w-full appearance-none pl-2.5 pr-6 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer truncate"
               >
-                <option value="open">💬 Open Chats</option>
-                <option value="active24h">🔥 Active 24h</option>
-                <option value="closed">⏱ Closed</option>
-                <option value="archived">📦 Archived ({archivedIds.size})</option>
+                <option value="open">Open Chats</option>
+                <option value="active24h">Active 24h</option>
+                <option value="closed">Closed</option>
+                <option value="archived">Archived ({archivedIds.size})</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -783,8 +783,8 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 onChange={(e) => setSortOrder(e.target.value as any)}
                 className="appearance-none pl-2.5 pr-6 py-1 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-white text-xs font-semibold text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#D92228] cursor-pointer"
               >
-                <option value="newest">⇅ Newest</option>
-                <option value="oldest">⇅ Oldest</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -803,13 +803,13 @@ export function SplitChatView({ initialId }: SplitChatViewProps) {
                 }`}
                 title="Filter conversations by date"
               >
-                <option value="all">📅 All Dates</option>
-                <option value="today">📅 Today</option>
-                <option value="yesterday">📅 Yesterday</option>
-                <option value="3">📅 Last 3 days</option>
-                <option value="7">📅 Last 7 days</option>
-                <option value="30">📅 Last 30 days</option>
-                <option value="custom">📅 Custom calendar</option>
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="3">Last 3 days</option>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="custom">Custom calendar</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>

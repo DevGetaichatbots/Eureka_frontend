@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { Contact, Message } from '@/types';
 import { api } from '@/lib/api';
@@ -27,9 +28,11 @@ interface LeadsTableProps {
 }
 
 export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: LeadsTableProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [downloadingId, setDownloadingId] = useState<{ id: number; type: 'csv' | 'xlsx' } | null>(null);
+  const [navigatingId, setNavigatingId] = useState<number | null>(null);
   const [leadToDelete, setLeadToDelete] = useState<Contact | null>(null);
 
   const fetchLeadMessages = async (contactId: number): Promise<Message[]> => {
@@ -294,14 +297,29 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
                       <span>XLSX</span>
                     </button>
 
-                    {/* View Chat Link */}
-                    <Link
-                      href={`/conversations/${contact.id}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-[#1A1A1A] hover:bg-[#D92228] hover:text-white hover:border-[#D92228] transition-all shadow-xs cursor-pointer"
+                    {/* View Chat Button with Loader */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNavigatingId(contact.id);
+                        router.push(`/conversations/${contact.id}`);
+                      }}
+                      disabled={navigatingId === contact.id}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E5E7EB] text-[#1A1A1A] hover:bg-[#D92228] hover:text-white hover:border-[#D92228] transition-all shadow-xs cursor-pointer disabled:opacity-75"
+                      title={`Open chat for ${name}`}
                     >
-                      <span>View Chat</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
+                      {navigatingId === contact.id ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D92228] group-hover:text-white" />
+                          <span>Loading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>View Chat</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
 
                     {/* Delete Lead Button (Administrator Only) */}
                     {isAdmin && onDeleteLead && (
