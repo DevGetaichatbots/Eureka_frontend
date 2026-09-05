@@ -37,17 +37,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoFill = (type: 'admin' | 'viewer') => {
-    if (type === 'admin') {
-      setEmail('admin@eurekajo.com');
-      setPassword('Admin@123456');
-    } else {
-      setEmail('viewer@eurekajo.com');
-      setPassword('Admin@123456');
-    }
-    setError(null);
-  };
-
   return (
     <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-white">
       {/* Brand Header */}
@@ -139,29 +128,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* Demo Fast Fill Pill */}
-        <div className="mt-8 pt-6 border-t border-[#E5E7EB]">
-          <p className="text-xs text-center text-[#6B7280] mb-3">
-            Quick testing credentials:
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => handleDemoFill('admin')}
-              className="flex-1 py-2 px-3 text-xs font-semibold rounded-xl border border-[#E5E7EB] hover:bg-[#FDEBEC] hover:text-[#D92228] hover:border-[#F5C2C4] text-[#1A1A1A] transition-colors cursor-pointer"
-            >
-              Fill Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDemoFill('viewer')}
-              className="flex-1 py-2 px-3 text-xs font-semibold rounded-xl border border-[#E5E7EB] hover:bg-[#FDEBEC] hover:text-[#D92228] hover:border-[#F5C2C4] text-[#1A1A1A] transition-colors cursor-pointer"
-            >
-              Fill Viewer
-            </button>
-          </div>
-        </div>
       </div>
 
       <p className="mt-6 text-xs text-[#6B7280] text-center">
