@@ -267,12 +267,12 @@ NEXT_PUBLIC_API_URL=https://your-backend-domain.com
 
 | Issue / Symptom | Root Cause | Solution |
 | :--- | :--- | :--- |
-| **Fallback reply sent to customer** | n8n workflow took longer than 60s or service offline | Check `/errors` table in CRM and verify n8n workflow execution status. |
-| **Messages not showing in real time** | Meta Webhook URL disconnected or verify token mismatch | Check Meta App Dashboard -> WhatsApp -> Configuration. Verify webhook URL is `https://<backend-domain>/webhook` and verify token matches `META_VERIFY_TOKEN`. |
+| **Fallback message triggered** | Upstream n8n webhook response timeout (>60s) or workflow offline | Check `/errors` in CRM dashboard; verify n8n service and workflow execution status. |
+| **Messages not appearing in real time** | Meta Webhook URL disconnected or verify token mismatch | Check Meta App Dashboard -> WhatsApp -> Configuration. Verify webhook URL is `https://<backend-domain>/webhook` and verify token matches `META_VERIFY_TOKEN`. |
 | **Chat was cleared, customer messages again** | Expected WhatsApp behavior | Conversation resets and reappears as a fresh thread starting from the new message timestamp. |
 | **Archived chat showing in Open list** | Browser cache or multi-tab sync | Click **Reload** in header or refresh page. Ensure Supabase `archived_chats` record is active. |
-| **Admin cannot log in** | User disabled or token expired | Check `app_users` table in Supabase. Verify `status` is `'active'`. Reset password using backend seed script. |
-| **Arabic characters displayed improperly** | Encoding mismatch | FastAPI, Supabase, and Next.js use standard UTF-8 charset. Ensure terminal clients configure UTF-8 stdout. |
+| **Admin cannot log in** | User account disabled or token expired | Check `app_users` table in Supabase. Verify `status` is `'active'`. Reset password using backend seed script. |
+| **Arabic characters displayed improperly** | Client terminal character encoding mismatch | FastAPI, Supabase, and Next.js use standard UTF-8 charset. Ensure terminal clients configure UTF-8 stdout. |
 
 ---
 
