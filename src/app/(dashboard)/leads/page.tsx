@@ -34,6 +34,10 @@ export default function LeadsPage() {
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Deleted leads sync with localStorage & cross-tab / cross-component events
   const [deletedLeadKeys, setDeletedLeadKeys] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
@@ -127,20 +131,13 @@ export default function LeadsPage() {
     }
   };
 
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-
-  const loadLeads = async (pageNum = 1) => {
+  const loadLeads = async () => {
     setLoading(true);
     try {
-      const res = await api.getLeads(pageNum, 100);
+      const res = await api.getLeads(1, 500);
       const rawList = (res as any)?.items || (res as any)?.leads || [];
       const safeList = Array.isArray(rawList) ? rawList : [];
       setContacts(safeList);
-      setPage(res.page || 1);
-      setTotalPages(res.total_pages || 1);
-      setTotalItems((res as any)?.total || (res as any)?.total_leads || safeList.length);
 
       // If server returns active verified leads, un-suppress any revived leads in UI
       if (safeList.length > 0) {
@@ -172,18 +169,18 @@ export default function LeadsPage() {
   };
 
   useEffect(() => {
-    loadLeads(page);
+    loadLeads();
     // Poller to update leads in real-time
     const timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      loadLeads(page);
+      loadLeads();
     }, 10000);
     return () => clearInterval(timer);
-  }, [page]);
+  }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadLeads(page);
+    loadLeads();
   };
 
   // Contacts excluding deleted ones unless they have new activity after deletion
@@ -257,6 +254,7 @@ export default function LeadsPage() {
     setFromDate('');
     setToDate('');
     setDatePreset('all');
+    setPage(1);
   };
 
   // Date helper to check if a contact falls in the from-to date range
@@ -309,6 +307,23 @@ export default function LeadsPage() {
     return list;
   }, [visibleContacts, searchQuery, fromDate, toDate]);
 
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, fromDate, toDate, datePreset]);
+
+  // Total pages calculation
+  const totalPages = Math.max(1, Math.ceil(filteredContacts.length / pageSize));
+
+  // Ensure current page does not exceed total pages
+  const validPage = Math.min(page, totalPages);
+
+  // Paginated contacts to display on the current page
+  const paginatedContacts = useMemo(() => {
+    const startIndex = (validPage - 1) * pageSize;
+    return filteredContacts.slice(startIndex, startIndex + pageSize);
+  }, [filteredContacts, validPage, pageSize]);
+
   // Metrics based on filtered contacts
   const activeLeadsCount = useMemo(() => {
     return filteredContacts.filter((c) => isWithin24Hours(c.last_seen_at)).length;
@@ -324,7 +339,7 @@ export default function LeadsPage() {
     setTimeout(() => setExportSuccessMsg(null), 5000);
   };
 
-  // Download handlers
+  // Download handlers (exports all matching filtered contacts, not just the single page)
   const handleExportCsv = () => {
     if (filteredContacts.length === 0) {
       alert('No lead records match your selected date filter or search query.');
@@ -707,7 +722,7 @@ export default function LeadsPage() {
       {/* Main Leads Table Card */}
       <div className="bg-white dark:bg-[#162026] rounded-2xl border border-[#E5E7EB] dark:border-[#26353d] shadow-xs overflow-hidden">
         <LeadsTable
-          contacts={filteredContacts}
+          contacts={paginatedContacts}
           loading={loading}
           searchQuery={searchQuery}
           onDeleteLead={handleDeleteLead}
@@ -716,12 +731,16 @@ export default function LeadsPage() {
 
         {/* Pagination Bar */}
         <PaginationBar
-          page={page}
+          page={validPage}
           totalPages={totalPages}
           totalItems={filteredContacts.length}
-          limit={50}
+          limit={pageSize}
           itemName="leads"
           onPageChange={(newPage) => setPage(newPage)}
+          onLimitChange={(newLimit) => {
+            setPageSize(newLimit);
+            setPage(1);
+          }}
         />
       </div>
     </div>
