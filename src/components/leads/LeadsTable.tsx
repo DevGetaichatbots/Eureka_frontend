@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   Loader2,
   Trash2,
+  RotateCcw,
 } from 'lucide-react';
 
 interface LeadsTableProps {
@@ -25,9 +26,10 @@ interface LeadsTableProps {
   loading: boolean;
   searchQuery: string;
   onDeleteLead?: (contact: Contact) => void;
+  onResetFilters?: () => void;
 }
 
-export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: LeadsTableProps) {
+export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead, onResetFilters }: LeadsTableProps) {
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -213,18 +215,32 @@ export function LeadsTable({ contacts, loading, searchQuery, onDeleteLead }: Lea
 
   if (contacts.length === 0) {
     return (
-      <div className="py-16 px-6 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-[#202c33] text-[#8696a0] flex items-center justify-center mx-auto mb-3">
+      <div className="py-16 px-6 text-center space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-[#FDEBEC] text-[#D92228] flex items-center justify-center mx-auto">
           <MessageSquare className="w-6 h-6" />
         </div>
         <h3 className="text-sm font-bold text-[#111b21] dark:text-[#e9edef]">
           No unique leads found
         </h3>
-        <p className="text-xs text-[#8696a0] mt-1 max-w-xs mx-auto">
-          {searchQuery
+        <p className="text-xs text-[#8696a0] max-w-sm mx-auto">
+          {onResetFilters
+            ? 'No contacts match your selected date range or search query.'
+            : searchQuery
             ? `No contacts match "${searchQuery}". Try a different name or phone number.`
             : 'No customer contacts have been recorded yet.'}
         </p>
+        {onResetFilters && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#D92228] text-white hover:bg-[#B71C21] transition-colors cursor-pointer shadow-xs"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Clear Date & Search Filters</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
