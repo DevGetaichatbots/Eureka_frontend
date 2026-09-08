@@ -22,6 +22,37 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
+// Helper to get YYYY-MM-DD in Asia/Karachi (matching the display timezone)
+const getKarachiDateStr = (dateObj: Date = new Date()): string => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Karachi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(dateObj);
+  } catch {
+    return dateObj.toISOString().split('T')[0];
+  }
+};
+
+// Helper to extract YYYY-MM-DD key from an ISO timestamp
+const getContactDateKey = (isoStr: string | null | undefined): string => {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Karachi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch {
+    return '';
+  }
+};
+
 export default function LeadsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +60,7 @@ export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [datePreset, setDatePreset] = useState<'all' | 'today' | '7days' | '30days' | 'month' | 'custom'>('all');
+  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'yesterday' | '7days' | '30days' | 'month' | 'custom'>('all');
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null);
@@ -221,10 +252,9 @@ export default function LeadsPage() {
   }, [contacts, deletedLeadKeys, deletedCutoffs]);
 
   // Date Preset handler
-  const handlePresetSelect = (preset: 'all' | 'today' | '7days' | '30days' | 'month') => {
+  const handlePresetSelect = (preset: 'all' | 'today' | 'yesterday' | '7days' | '30days' | 'month') => {
     setDatePreset(preset);
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getKarachiDateStr(new Date());
 
     if (preset === 'all') {
       setFromDate('');
@@ -232,19 +262,23 @@ export default function LeadsPage() {
     } else if (preset === 'today') {
       setFromDate(todayStr);
       setToDate(todayStr);
+    } else if (preset === 'yesterday') {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const yStr = getKarachiDateStr(yesterday);
+      setFromDate(yStr);
+      setToDate(yStr);
     } else if (preset === '7days') {
-      const past = new Date();
-      past.setDate(now.getDate() - 7);
-      setFromDate(past.toISOString().split('T')[0]);
+      const past = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      setFromDate(getKarachiDateStr(past));
       setToDate(todayStr);
     } else if (preset === '30days') {
-      const past = new Date();
-      past.setDate(now.getDate() - 30);
-      setFromDate(past.toISOString().split('T')[0]);
+      const past = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      setFromDate(getKarachiDateStr(past));
       setToDate(todayStr);
     } else if (preset === 'month') {
+      const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      setFromDate(firstDay.toISOString().split('T')[0]);
+      setFromDate(getKarachiDateStr(firstDay));
       setToDate(todayStr);
     }
   };
@@ -257,29 +291,26 @@ export default function LeadsPage() {
     setPage(1);
   };
 
-  // Date helper to check if a contact falls in the from-to date range
+  // Accurate date matching helper using YYYY-MM-DD day keys
   const isLeadInDateRange = (contact: Contact, from: string, to: string) => {
     if (!from && !to) return true;
 
-    // Check last_seen_at or first_seen_at
-    const candidateDates = [contact.last_seen_at, contact.first_seen_at].filter(Boolean);
-    if (candidateDates.length === 0) return false;
+    // Normalizing order if from > to
+    const effectiveFrom = from && to && from > to ? to : from;
+    const effectiveTo = from && to && from > to ? from : to;
 
-    // Use primary last_seen timestamp or first_seen
-    const lastSeenTime = new Date(contact.last_seen_at || contact.first_seen_at).getTime();
-    if (isNaN(lastSeenTime)) return false;
+    const lastKey = getContactDateKey(contact.last_seen_at);
+    const firstKey = getContactDateKey(contact.first_seen_at);
 
-    if (from) {
-      const fromTime = new Date(`${from}T00:00:00`).getTime();
-      if (lastSeenTime < fromTime) return false;
-    }
+    const isKeyInRange = (key: string) => {
+      if (!key) return false;
+      if (effectiveFrom && key < effectiveFrom) return false;
+      if (effectiveTo && key > effectiveTo) return false;
+      return true;
+    };
 
-    if (to) {
-      const toTime = new Date(`${to}T23:59:59.999`).getTime();
-      if (lastSeenTime > toTime) return false;
-    }
-
-    return true;
+    // A lead matches if their last activity OR first contact date is within the selected range
+    return (lastKey ? isKeyInRange(lastKey) : false) || (firstKey ? isKeyInRange(firstKey) : false);
   };
 
   // Search & Date filtering applied together
@@ -379,7 +410,7 @@ export default function LeadsPage() {
       else if (fromDate) fileLabel = `from_${fromDate}`;
       else if (toDate) fileLabel = `up_to_${toDate}`;
       else {
-        fileLabel = new Date().toISOString().split('T')[0];
+        fileLabel = getKarachiDateStr(new Date());
       }
 
       a.download = `eureka_leads_${fileLabel}.csv`;
@@ -447,7 +478,7 @@ export default function LeadsPage() {
       else if (fromDate) fileLabel = `from_${fromDate}`;
       else if (toDate) fileLabel = `up_to_${toDate}`;
       else {
-        fileLabel = new Date().toISOString().split('T')[0];
+        fileLabel = getKarachiDateStr(new Date());
       }
 
       a.download = `eureka_leads_${fileLabel}.xlsx`;
@@ -512,7 +543,7 @@ export default function LeadsPage() {
             )}
             <span>Export CSV</span>
             {filteredContacts.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-50 text-blue-600 font-mono">
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-50 text-blue-600 font-mono font-semibold">
                 {filteredContacts.length}
               </span>
             )}
@@ -532,7 +563,7 @@ export default function LeadsPage() {
             )}
             <span>Export Excel (.xlsx)</span>
             {filteredContacts.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono font-semibold">
                 {filteredContacts.length}
               </span>
             )}
@@ -595,10 +626,15 @@ export default function LeadsPage() {
                   type="date"
                   value={fromDate}
                   onChange={(e) => {
-                    setFromDate(e.target.value);
+                    const val = e.target.value;
+                    setFromDate(val);
                     setDatePreset('custom');
                   }}
-                  className="py-1 px-2 rounded-lg border border-[#E5E7EB] dark:border-[#26353d] bg-[#F9FAFB] dark:bg-[#202c33] text-xs text-[#1A1A1A] dark:text-[#F3F4F6] focus:ring-1 focus:ring-[#D92228] focus:outline-none"
+                  className={`py-1 px-2.5 rounded-lg border text-xs text-[#1A1A1A] dark:text-[#F3F4F6] focus:ring-2 focus:ring-[#D92228] focus:outline-none transition-all ${
+                    fromDate
+                      ? 'border-[#D92228] bg-white dark:bg-[#202c33] font-medium'
+                      : 'border-[#E5E7EB] dark:border-[#26353d] bg-[#F9FAFB] dark:bg-[#202c33]'
+                  }`}
                 />
               </div>
 
@@ -608,10 +644,15 @@ export default function LeadsPage() {
                   type="date"
                   value={toDate}
                   onChange={(e) => {
-                    setToDate(e.target.value);
+                    const val = e.target.value;
+                    setToDate(val);
                     setDatePreset('custom');
                   }}
-                  className="py-1 px-2 rounded-lg border border-[#E5E7EB] dark:border-[#26353d] bg-[#F9FAFB] dark:bg-[#202c33] text-xs text-[#1A1A1A] dark:text-[#F3F4F6] focus:ring-1 focus:ring-[#D92228] focus:outline-none"
+                  className={`py-1 px-2.5 rounded-lg border text-xs text-[#1A1A1A] dark:text-[#F3F4F6] focus:ring-2 focus:ring-[#D92228] focus:outline-none transition-all ${
+                    toDate
+                      ? 'border-[#D92228] bg-white dark:bg-[#202c33] font-medium'
+                      : 'border-[#E5E7EB] dark:border-[#26353d] bg-[#F9FAFB] dark:bg-[#202c33]'
+                  }`}
                 />
               </div>
             </div>
@@ -641,6 +682,18 @@ export default function LeadsPage() {
               }`}
             >
               Today
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handlePresetSelect('yesterday')}
+              className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
+                datePreset === 'yesterday'
+                  ? 'bg-[#D92228] text-white shadow-xs'
+                  : 'bg-[#F9FAFB] dark:bg-[#202c33] text-[#6B7280] dark:text-[#9CA3AF] hover:bg-[#E5E7EB] dark:hover:bg-[#2a3942]'
+              }`}
+            >
+              Yesterday
             </button>
 
             <button
@@ -684,7 +737,7 @@ export default function LeadsPage() {
                 type="button"
                 onClick={handleResetFilters}
                 title="Reset All Filters"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-[#D92228] hover:bg-[#FDEBEC] transition-colors ml-1 font-semibold cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-[#D92228] hover:bg-[#FDEBEC] transition-colors ml-1 font-semibold cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Reset</span>
@@ -695,23 +748,26 @@ export default function LeadsPage() {
 
         {/* Active Filter Info Banner */}
         {isFiltered && (
-          <div className="pt-2 flex items-center justify-between text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
+          <div className="pt-2 flex items-center justify-between text-[11px] text-[#6B7280] dark:text-[#9CA3AF] bg-[#FDEBEC]/40 dark:bg-[#D92228]/10 p-2 rounded-xl border border-[#F5C2C4] dark:border-[#D92228]/20">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#D92228]" />
+              <span className="w-2 h-2 rounded-full bg-[#D92228] animate-pulse" />
               <span>
-                Showing <strong className="text-[#1A1A1A] dark:text-[#F3F4F6]">{filteredContacts.length}</strong> of{' '}
+                Showing <strong className="text-[#1A1A1A] dark:text-[#F3F4F6] font-bold">{filteredContacts.length}</strong> of{' '}
                 {visibleContacts.length} leads
-                {fromDate && toDate && (
-                  <> (filtered from <strong>{fromDate}</strong> to <strong>{toDate}</strong>)</>
+                {fromDate && toDate && fromDate === toDate && (
+                  <> on date <strong>{fromDate}</strong></>
                 )}
-                {fromDate && !toDate && <> (from <strong>{fromDate}</strong> onwards)</>}
-                {!fromDate && toDate && <> (up to <strong>{toDate}</strong>)</>}
+                {fromDate && toDate && fromDate !== toDate && (
+                  <> from <strong>{fromDate}</strong> to <strong>{toDate}</strong></>
+                )}
+                {fromDate && !toDate && <> from <strong>{fromDate}</strong> onwards</>}
+                {!fromDate && toDate && <> up to <strong>{toDate}</strong></>}
                 {searchQuery && <> matching &ldquo;<strong>{searchQuery}</strong>&rdquo;</>}
               </span>
             </div>
             <button
               onClick={handleResetFilters}
-              className="text-[#D92228] hover:underline font-semibold cursor-pointer"
+              className="text-[#D92228] hover:underline font-bold cursor-pointer"
             >
               Clear filters
             </button>
