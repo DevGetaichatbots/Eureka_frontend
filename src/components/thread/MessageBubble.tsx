@@ -314,7 +314,10 @@ export function MessageBubble({
 
         {/* Message Text Body */}
         {normalText && message.msg_type !== 'audio' && (
-          <div className="whitespace-pre-wrap leading-relaxed break-words text-[13.5px] select-text">
+          <div
+            dir="auto"
+            className="whitespace-pre-wrap leading-relaxed break-words text-[13.5px] select-text"
+          >
             {renderMessageContent(normalText, searchQuery, isBot)}
           </div>
         )}
