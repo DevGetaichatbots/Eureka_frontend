@@ -51,6 +51,12 @@ function renderHighlightedText(text: string, query?: string, isBot = false, keyP
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
+// Insert an invisible break opportunity after each "/" so long links wrap at
+// natural segment boundaries instead of splitting mid-word (e.g. "http" | "s://...").
+function withWrapBreaks(url: string) {
+  return url.replace(/\//g, '/\u200B');
+}
+
 function renderMessageContent(text: string, query?: string, isBot = false) {
   const parts = text.split(URL_REGEX);
   return parts.map((part, i) => {
@@ -60,18 +66,21 @@ function renderMessageContent(text: string, query?: string, isBot = false) {
       const trailing = trailingMatch ? trailingMatch[0] : '';
       const url = trailing ? part.slice(0, -trailing.length) : part;
       return (
-        <React.Fragment key={i}>
+        <div key={i} className="flex items-start gap-1 my-0.5 max-w-full">
+          <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="underline underline-offset-2 break-all hover:opacity-80 cursor-pointer"
+            className={`break-words font-medium underline underline-offset-2 hover:opacity-80 cursor-pointer ${
+              isBot ? 'text-white decoration-white/70' : 'text-[#0A66C2] decoration-[#0A66C2]/40'
+            }`}
           >
-            {renderHighlightedText(url, query, isBot, `${i}-`)}
+            {renderHighlightedText(withWrapBreaks(url), query, isBot, `${i}-`)}
           </a>
-          {trailing}
-        </React.Fragment>
+          {trailing && <span>{trailing}</span>}
+        </div>
       );
     }
     return (
@@ -305,9 +314,9 @@ export function MessageBubble({
 
         {/* Message Text Body */}
         {normalText && message.msg_type !== 'audio' && (
-          <p className="whitespace-pre-wrap leading-relaxed break-words text-[13.5px] select-text">
+          <div className="whitespace-pre-wrap leading-relaxed break-words text-[13.5px] select-text">
             {renderMessageContent(normalText, searchQuery, isBot)}
-          </p>
+          </div>
         )}
 
         {/* Bottom Metadata: Timestamp & Status */}
