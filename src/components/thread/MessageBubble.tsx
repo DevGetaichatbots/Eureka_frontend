@@ -27,7 +27,7 @@ interface MessageBubbleProps {
   isFocusedResult?: boolean;
 }
 
-function renderHighlightedText(text: string, query?: string, isBot = false) {
+function renderHighlightedText(text: string, query?: string, isBot = false, keyPrefix = '') {
   if (!query || !query.trim()) return text;
   const q = query.trim();
   const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -36,7 +36,7 @@ function renderHighlightedText(text: string, query?: string, isBot = false) {
   return parts.map((part, i) =>
     regex.test(part) ? (
       <mark
-        key={i}
+        key={`${keyPrefix}${i}`}
         className={`px-0.5 rounded font-semibold ${
           isBot ? 'bg-amber-300 text-black shadow-xs' : 'bg-yellow-200 text-yellow-950 shadow-xs'
         }`}
@@ -47,6 +47,37 @@ function renderHighlightedText(text: string, query?: string, isBot = false) {
       part
     )
   );
+}
+
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+function renderMessageContent(text: string, query?: string, isBot = false) {
+  const parts = text.split(URL_REGEX);
+  return parts.map((part, i) => {
+    if (part.match(URL_REGEX)) {
+      // Strip trailing punctuation that's likely part of the surrounding sentence, not the URL
+      const trailingMatch = part.match(/[).,!?؟،]+$/);
+      const trailing = trailingMatch ? trailingMatch[0] : '';
+      const url = trailing ? part.slice(0, -trailing.length) : part;
+      return (
+        <React.Fragment key={i}>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="underline underline-offset-2 break-all hover:opacity-80 cursor-pointer"
+          >
+            {renderHighlightedText(url, query, isBot, `${i}-`)}
+          </a>
+          {trailing}
+        </React.Fragment>
+      );
+    }
+    return (
+      <React.Fragment key={i}>{renderHighlightedText(part, query, isBot, `${i}-`)}</React.Fragment>
+    );
+  });
 }
 
 export function MessageBubble({
@@ -274,8 +305,8 @@ export function MessageBubble({
 
         {/* Message Text Body */}
         {normalText && message.msg_type !== 'audio' && (
-          <p className="whitespace-pre-wrap leading-relaxed break-words text-[13.5px]">
-            {renderHighlightedText(normalText, searchQuery, isBot)}
+          <p className="whitespace-pre-wrap leading-relaxed break-words text-[13.5px] select-text">
+            {renderMessageContent(normalText, searchQuery, isBot)}
           </p>
         )}
 
